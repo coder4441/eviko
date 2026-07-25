@@ -37,6 +37,7 @@ export async function GET(
             select: {
                 id: true,
                 dailyOrderNumber: true,
+                queueStatus: true,
                 createdAt: true
             },
             orderBy: {
