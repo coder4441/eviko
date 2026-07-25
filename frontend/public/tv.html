@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EVIKO – Navbat Ekrani</title>
+    <link id="manifest-link" rel="manifest" href="">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -40,6 +41,26 @@
         }
         #shop-name { font-size: 34px; font-weight: 900; color: #111; line-height: 1; }
         #shop-sub { font-size: 14px; font-weight: 600; color: #9ca3af; margin-top: 4px; }
+        
+        #install-btn {
+            display: none;
+            background: #2563eb;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 800;
+            cursor: pointer;
+            margin-right: 24px;
+            box-shadow: 0 4px 12px rgba(37,99,235,0.25);
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        #install-btn:hover { background: #1d4ed8; transform: scale(1.05); }
+
+        #clock-wrapper { display: flex; align-items: center; }
         #clock { text-align: right; }
         #clock-time { font-size: 44px; font-weight: 900; color: #1a1a2e; line-height: 1; font-variant-numeric: tabular-nums; }
         #clock-date { font-size: 14px; color: #9ca3af; font-weight: 600; margin-top: 4px; }
@@ -198,9 +219,12 @@
             <div id="shop-sub">Buyurtmalar Navbati</div>
         </div>
     </div>
-    <div id="clock">
-        <div id="clock-time">00:00</div>
-        <div id="clock-date">—</div>
+    <div id="clock-wrapper">
+        <button id="install-btn">⬇️ Ilova qilib o'rnatish</button>
+        <div id="clock">
+            <div id="clock-time">00:00</div>
+            <div id="clock-date">—</div>
+        </div>
     </div>
 </div>
 
@@ -253,6 +277,46 @@
 
     const API_BASE = window.location.origin; // same server
     let prevReady = [];
+
+    // ── PWA & DYNAMIC MANIFEST ─────────────────────────
+    const manifest = {
+        name: "EVIKO Navbat",
+        short_name: "Navbat",
+        start_url: window.location.href,
+        display: "fullscreen",
+        background_color: "#ffffff",
+        theme_color: "#f97316",
+        icons: [
+            { src: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png" },
+            { src: "/icons/icon-512x512.png", sizes: "512x512", type: "image/png" }
+        ]
+    };
+    const blob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
+    document.getElementById('manifest-link').href = URL.createObjectURL(blob);
+
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js').catch(()=>{});
+        });
+    }
+
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        document.getElementById('install-btn').style.display = 'block';
+    });
+
+    document.getElementById('install-btn').addEventListener('click', async () => {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            if (outcome === 'accepted') {
+                document.getElementById('install-btn').style.display = 'none';
+            }
+            deferredPrompt = null;
+        }
+    });
 
     // ── CLOCK ──────────────────────────────────────────
     function updateClock() {
