@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/backend/auth";
+import { getSession } from "@/lib/backend/auth";
 
 const prisma = new PrismaClient();
 
 // Get active KDS orders for the logged-in tenant
 export async function GET(request: NextRequest) {
     try {
-        const session = await getServerSession(authOptions);
+        const session = await getSession();
         if (!session?.tenantId) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
@@ -52,7 +51,7 @@ export async function GET(request: NextRequest) {
 // Update order status
 export async function POST(request: NextRequest) {
     try {
-        const session = await getServerSession(authOptions);
+        const session = await getSession();
         if (!session?.tenantId) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }

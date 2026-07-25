@@ -37,9 +37,7 @@ export async function GET(
             select: {
                 id: true,
                 dailyOrderNumber: true,
-                queueStatus: true,
-                updatedAt: true // Wait, Prisma doesn't have updatedAt on Transaction by default unless added. We can use createdAt.
-                // Let's just return what we have
+                createdAt: true
             },
             orderBy: {
                 createdAt: "asc" // Oldest first

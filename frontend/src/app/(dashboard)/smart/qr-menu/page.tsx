@@ -162,7 +162,7 @@ export default function AdminQRMenuPage() {
                         {copied ? "Nusxalandi!" : "Havolani nusxalash"}
                     </button>
                     <a
-                        href={`/queue/${tenant.shopCode}`} target="_blank" rel="noreferrer"
+                        href={`/queue/${shopCode}`} target="_blank" rel="noreferrer"
                         className="px-4 py-2.5 bg-green-50 hover:bg-green-100 text-green-700 text-sm font-semibold rounded-xl border border-green-200 flex items-center gap-2 shadow-sm transition"
                     >
                         TV Navbat Ekrani
