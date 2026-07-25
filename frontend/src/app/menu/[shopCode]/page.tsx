@@ -289,12 +289,12 @@ export default function PublicQRMenuPage() {
                 </div>
             </div>
 
-            {/* ── PRODUCT LIST ─────────────────────────────── */}
+            {/* ── PRODUCT GRID ─────────────────────────────── */}
             <main className="max-w-md mx-auto px-4 pt-5 space-y-8">
                 {filteredProducts.length === 0 ? (
                     <div className="py-16 text-center">
                         <div className="w-16 h-16 rounded-3xl flex items-center justify-center mx-auto mb-4" style={{ background: tcLight }}>
-                            <Coffee className="w-8 h-8" style={{ color: tc }} />
+                            <Coffee className="w-8 h-8 opacity-30" style={{ color: tc }} />
                         </div>
                         <p className="text-gray-400 font-medium">Ushbu bo'limda taomlar topilmadi</p>
                     </div>
@@ -302,39 +302,48 @@ export default function PublicQRMenuPage() {
                     Object.entries(grouped).map(([cat, items]) => (
                         <section key={cat}>
                             {activeCategory === "all" && (
-                                <div className="flex items-center gap-3 mb-3">
+                                <div className="flex items-center gap-3 mb-4">
                                     <h2 className="text-sm font-black text-gray-700 uppercase tracking-wider">{cat}</h2>
                                     <div className="flex-1 h-px bg-gray-200" />
                                     <span className="text-xs text-gray-400">{items.length} ta</span>
                                 </div>
                             )}
-                            <div className="space-y-3">
+                            {/* 2-column grid */}
+                            <div className="grid grid-cols-2 gap-3">
                                 {items.map(product => (
                                     <div key={product.id}
-                                        className="bg-white border border-gray-100 rounded-2xl overflow-hidden flex items-stretch shadow-sm hover:shadow-md transition group">
+                                        className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all group flex flex-col">
                                         {/* Image */}
-                                        <div className="w-24 h-24 flex items-center justify-center shrink-0 relative overflow-hidden"
+                                        <div className="w-full aspect-square flex items-center justify-center relative overflow-hidden"
                                             style={{ background: tcLighter }}>
                                             {product.image ? (
                                                 <img src={product.image} alt={product.name}
-                                                    className="w-full h-full object-cover group-hover:scale-110 transition duration-300" />
+                                                    className="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
                                             ) : (
-                                                <Utensils className="w-8 h-8 opacity-30" style={{ color: tc }} />
+                                                <div className="flex flex-col items-center gap-2">
+                                                    <Utensils className="w-10 h-10 opacity-20" style={{ color: tc }} />
+                                                </div>
                                             )}
+                                            {/* Category badge on image */}
+                                            <div className="absolute top-2 left-2">
+                                                <span className="text-[9px] font-black uppercase tracking-wide px-2 py-0.5 rounded-full text-white"
+                                                    style={{ background: tc }}>
+                                                    {product.category}
+                                                </span>
+                                            </div>
                                         </div>
                                         {/* Info */}
-                                        <div className="flex-1 px-3.5 py-3 flex flex-col justify-center">
-                                            <span className="text-[10px] font-bold uppercase tracking-wider mb-0.5" style={{ color: tc }}>
-                                                {product.category}
-                                            </span>
-                                            <h3 className="font-bold text-gray-800 text-sm leading-snug line-clamp-2">
+                                        <div className="p-3 flex flex-col flex-1 justify-between">
+                                            <h3 className="font-bold text-gray-800 text-sm leading-snug line-clamp-2 mb-2">
                                                 {product.name}
                                             </h3>
-                                            <div className="mt-2 flex items-baseline gap-2">
-                                                <span className="text-base font-black" style={{ color: tc }}>
+                                            <div className="flex items-baseline justify-between gap-1 mt-auto">
+                                                <span className="text-sm font-black" style={{ color: tc }}>
                                                     {formatPrice(product.sellingPrice)}
                                                 </span>
-                                                {product.unit && <span className="text-xs text-gray-400">/ {product.unit}</span>}
+                                                {product.unit && (
+                                                    <span className="text-[10px] text-gray-400 shrink-0">/ {product.unit}</span>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
