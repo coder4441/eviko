@@ -73,8 +73,6 @@ export default function RootLayout({
                 <meta name="apple-mobile-web-app-title" content="EVIKO" />
                 {/* manifest endi metadata orqali beriladi (route bo'yicha override qilinadi) */}
                 <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
-                {/* Times New Roman system font ishlatilmoqda */}
-                <style>{`* { font-family: 'Times New Roman', Times, serif !important; }`}</style>
                 <script
                     type="application/ld+json"
                     dangerouslySetInnerHTML={{
@@ -102,7 +100,7 @@ export default function RootLayout({
                 />
                 <script
                     dangerouslySetInnerHTML={{
-                        __html: `if ('serviceWorker' in navigator) { window.addEventListener('load', function() { navigator.serviceWorker.register('/sw.js'); }); }`
+                        __html: `if ('serviceWorker' in navigator) { window.addEventListener('load', function() { try { navigator.serviceWorker.register('/sw.js'); } catch(e) {} }); }`
                     }}
                 />
             </head>

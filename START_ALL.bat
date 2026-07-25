@@ -22,7 +22,7 @@ timeout /t 3 /nobreak >nul
 echo.
 echo 3. Frontend (Next.js) ishga tushirilmoqda...
 cd /d "%~dp0\frontend"
-start "Frontend" cmd.exe /c "set PATH=C:\Users\zim zim\.gemini\antigravity\scratch\node\node-v20.9.0-win-x64;%PATH% && npm run dev"
+start "Frontend" cmd.exe /c "set ""PATH=C:\Users\zim zim\.gemini\antigravity\scratch\node\node-v20.9.0-win-x64;%PATH%"" && npm run dev"
 timeout /t 7 /nobreak >nul
 
 echo.

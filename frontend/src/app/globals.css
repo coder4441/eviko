@@ -4,6 +4,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Times New Roman system font */
+* {
+  font-family: 'Times New Roman', Times, serif !important;
+}
+
 /* ── SYSTEM THEME (Light) ─────────────────────────────────────── */
 :root {
   --bg-primary: #f0f4f8;
