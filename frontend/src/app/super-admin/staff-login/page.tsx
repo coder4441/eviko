@@ -80,10 +80,7 @@ export default function StaffLoginPage() {
 
             const success = login(data.user);
             if (success) {
-                if (selectedRole === "Agent") router.push("/agent-portal");
-                else if (selectedRole === "Texnik Yordam") router.push("/support-portal");
-                else if (selectedRole === "Moliyachi") router.push("/finance-portal");
-                else router.push("/super-admin");
+                router.push("/super-admin");
             } else {
                 setError("Tizimga kirishda noma'lum xatolik");
             }
