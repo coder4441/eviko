@@ -294,10 +294,11 @@ export interface AppState {
         token?: string;
         printerIp?: string;
         autoPrintReceipt?: boolean;
+        role?: string;
     } | null;
 
     // Kassir / Ofitsiant sessiyasi
-    kassirSession: { id: string; name: string; branch: string; permissions: string[]; shopCode?: string; shopType?: string; token?: string; printerIp?: string; autoPrintReceipt?: boolean; serviceFeePct?: number; sessionToken?: string } | null;
+    kassirSession: { id: string; name: string; branch: string; permissions: string[]; shopCode?: string; shopType?: string; token?: string; printerIp?: string; autoPrintReceipt?: boolean; serviceFeePct?: number; sessionToken?: string; role?: string } | null;
 
     // Actions
     addTransaction: (tx: Transaction) => void;
