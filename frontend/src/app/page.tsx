@@ -53,7 +53,7 @@ export default function LandingPage() {
                     </div>
                     <button 
                         onClick={() => setIsModalOpen(true)}
-                        className="bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl font-bold text-[15px] transition-all shadow-lg"
+                        className="bg-gray-900 hover:bg-gray-800 text-white px-5 py-2.5 rounded-xl font-bold text-[15px] transition-all shadow-lg"
                     >
                         Ariza qoldirish
                     </button>
@@ -231,7 +231,7 @@ export default function LandingPage() {
             </section>
 
             {/* CTA Section */}
-            <section id="contact" className="py-20 bg-slate-900 relative overflow-hidden">
+            <section id="contact" className="py-20 bg-gray-900 relative overflow-hidden">
                 <div className="absolute inset-0 pointer-events-none opacity-50">
                     <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-blue-600/20 blur-[100px] rounded-full"></div>
                     <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] bg-indigo-500/20 blur-[100px] rounded-full"></div>
@@ -270,7 +270,7 @@ export default function LandingPage() {
                     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                         <motion.div 
                             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+                            className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm"
                             onClick={() => setIsModalOpen(false)}
                         />
                         <motion.div 
