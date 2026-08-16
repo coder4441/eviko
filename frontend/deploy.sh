@@ -6,28 +6,32 @@ cd /home/evikouz/eviko_new/frontend || exit
 echo "-> Yangi kodlar tortilmoqda..."
 git pull
 
-echo "-> Production kutubxonalari o'rnatilmoqda..."
+echo "-> Kutubxonalar o'rnatilmoqda (postinstall o'chirilgan)..."
 export NODE_ENV=production
-npm install --omit=dev
+# --ignore-scripts: postinstall va boshqa skriptlarni o'tkazib yuboradi
+npm install --omit=dev --ignore-scripts
 
-echo "-> Prisma generate (to'liq yo'l bilan)..."
+echo "-> Prisma generate (absolut yo'l bilan)..."
 NODEVENV_BIN="/home/evikouz/nodevenv/frontend/20/bin"
-SCHEMA_PATH="/home/evikouz/eviko_new/frontend/prisma/schema.prisma"
+SCHEMA="/home/evikouz/eviko_new/frontend/prisma/schema.prisma"
 
 if [ -f "$NODEVENV_BIN/prisma" ]; then
-    echo "   nodevenv prisma topildi..."
-    "$NODEVENV_BIN/prisma" generate --schema="$SCHEMA_PATH" && echo "   ✅ Prisma OK" || echo "   ⚠️  Prisma xato (davom etiladi)"
-elif [ -f "node_modules/.bin/prisma" ]; then
-    node_modules/.bin/prisma generate --schema="$SCHEMA_PATH" && echo "   ✅ Prisma OK" || echo "   ⚠️  Prisma xato (davom etiladi)"
+    "$NODEVENV_BIN/prisma" generate --schema="$SCHEMA" \
+        && echo "   ✅ Prisma OK" \
+        || echo "   ⚠️  Prisma xato (build .next dan ishlaydi)"
+elif [ -f "/home/evikouz/eviko_new/frontend/node_modules/.bin/prisma" ]; then
+    /home/evikouz/eviko_new/frontend/node_modules/.bin/prisma generate --schema="$SCHEMA" \
+        && echo "   ✅ Prisma OK" \
+        || echo "   ⚠️  Prisma xato"
 else
-    echo "   ⚠️  Prisma binary topilmadi, o'tkazib yuborilmoqda..."
+    echo "   ⚠️  Prisma binary topilmadi"
 fi
 
-echo "-> .next papkasi mavjudligi tekshirilmoqda..."
+echo "-> .next holati..."
 if [ -d ".next" ]; then
-    echo "   ✅ .next papkasi topildi - Build shart emas!"
+    echo "   ✅ .next TAYYOR!"
 else
-    echo "   ❌ .next papkasi yo'q!"
+    echo "   ❌ .next YO'Q!"
 fi
 
-echo "-> TAYYOR! Endi cPanel'dan 'Restart' bosing."
+echo "-> Barcha qadamlar tugadi! cPanel -> Node.js -> Restart bosing."
