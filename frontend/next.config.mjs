@@ -9,6 +9,10 @@ const nextConfig = {
     reactStrictMode: false,
     compress: true,
     poweredByHeader: false,
+
+    // cPanel RAM muammosini hal qilish uchun source map o'chirildi
+    productionBrowserSourceMaps: false,
+
     compiler: {
         removeConsole: process.env.NODE_ENV === 'production' ? { exclude: ['error'] } : false,
     },
@@ -19,6 +23,9 @@ const nextConfig = {
     experimental: {
         optimizePackageImports: ['lucide-react', 'recharts'],
     },
+
+    // Turbopack o'chirildi (cPanel uchun webpack ishlatiladi)
+    turbopack: {},
 
     // @ alias ni to'g'ridan-to'g'ri webpack ga ko'rsatamiz (cPanel uchun)
     webpack(config) {
