@@ -1,0 +1,163 @@
+export const dynamic = 'force-dynamic';
+import { NextRequest, NextResponse } from "next/server";
+import { getSession } from "@/lib/backend/auth";
+import { prisma } from "@/lib/backend/db";
+import { jwtVerify } from "jose";
+import { JWT_SECRET } from "@/lib/backend/jwt";
+
+// Single auth helper — one DB call for cookie sessions, fallback to JWT.
+// Previously used getSession() + getTenantId() which called getSession() twice.
+async function getAuthTenantId(request: NextRequest): Promise<string | null> {
+    try {
+        const session = await getSession();
+        if (session?.tenantId) return session.tenantId;
+    } catch {}
+
+    const authHeader = request.headers.get("Authorization");
+    if (authHeader?.startsWith("Bearer ")) {
+        try {
+            const { payload } = await jwtVerify(authHeader.slice(7), JWT_SECRET);
+            if (payload.tenantId) return payload.tenantId as string;
+        } catch {}
+    }
+    return null;
+}
+
+// ─── 5s server-side cache ────────────────────────────────────────────────
+// Bir vaqtda bir nechta client so'rov yuborganda DB ni kamaytiradi.
+// PUT/POST/DELETE larda cache tozalanadi.
+const _tablesCache = new Map<string, { data: any; expiresAt: number }>();
+const TABLES_CACHE_TTL = 5_000;
+function invalidateTablesCache(tenantId: string) { _tablesCache.delete(tenantId); }
+
+export async function GET(request: NextRequest) {
+    try {
+        const tenantId = await getAuthTenantId(request);
+        if (!tenantId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+        // Cache hit check
+        const cached = _tablesCache.get(tenantId);
+        if (cached && Date.now() < cached.expiresAt) return NextResponse.json(cached.data);
+
+        const tables = await prisma.smartTable.findMany({
+            where: { tenantId },
+            orderBy: [{ section: 'asc' }, { tableNumber: 'asc' }]
+        });
+
+        // Map service fee from tenant settings
+        let ubtZones: any[] = [];
+        const tObj = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
+        if (tObj?.settings) {
+            try {
+                const parsed = JSON.parse(tObj.settings as string);
+                ubtZones = parsed.smartSettings?.zones || [];
+            } catch {}
+        }
+        
+        const tablesWithFee = tables.map(t => {
+            const z = ubtZones.find((zone: any) => zone.name === t.section);
+            const fee = z?.serviceFee !== undefined ? Number(z.serviceFee) : 0;
+            const extraPriceType = z?.extraPriceType || "Qo'shimcha narx";
+            const extraPriceValue = z?.extraPriceValue ? Number(z.extraPriceValue) : 0;
+            let tableJson: any = null;
+            if (z?.tables && Array.isArray(z.tables)) {
+                tableJson = z.tables.find((tb: any) => tb.name === t.tableNumber) ?? null;
+            }
+            const isActive = tableJson ? tableJson.isActive !== false : false;
+            return { ...t, serviceFee: fee, extraPriceType, extraPriceValue, isActive };
+        }).filter(t => t.isActive);
+
+        tablesWithFee.sort((a, b) => {
+            if (a.section !== b.section) return a.section.localeCompare(b.section);
+            const numA = parseInt(a.tableNumber.match(/\d+/)?.at(0) || "0", 10);
+            const numB = parseInt(b.tableNumber.match(/\d+/)?.at(0) || "0", 10);
+            if (numA !== numB) return numA - numB;
+            return a.tableNumber.localeCompare(b.tableNumber);
+        });
+
+        const result = { tables: tablesWithFee };
+        _tablesCache.set(tenantId, { data: result, expiresAt: Date.now() + TABLES_CACHE_TTL });
+        return NextResponse.json(result);
+    } catch (error) {
+        return NextResponse.json({ error: "Server error" }, { status: 500 });
+    }
+}
+
+
+export async function POST(request: NextRequest) {
+    try {
+        const tenantId = await getAuthTenantId(request);
+        if (!tenantId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+        const { tableNumber, capacity, section } = await request.json();
+
+        const table = await prisma.smartTable.create({
+            data: {
+                tenantId,
+                tableNumber,
+                capacity: capacity || 4,
+                section: section || "Ichki",
+                status: "free"
+            }
+        });
+
+        invalidateTablesCache(tenantId);
+        return NextResponse.json({ success: true, table }, { status: 201 });
+    } catch (error) {
+        return NextResponse.json({ error: "Server error" }, { status: 500 });
+    }
+}
+
+export async function PUT(request: NextRequest) {
+    try {
+        const tenantId = await getAuthTenantId(request);
+        if (!tenantId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+        const { id, status, order, amount, since, waiter } = await request.json();
+
+        if (!id) return NextResponse.json({ error: "id majburiy" }, { status: 400 });
+        if (status && !["free", "occupied", "reserved"].includes(status)) {
+            return NextResponse.json({ error: "Status noto'g'ri" }, { status: 400 });
+        }
+        if (amount !== undefined && amount !== null && Number(amount) < 0) {
+            return NextResponse.json({ error: "Summa manfiy bo'lishi mumkin emas" }, { status: 400 });
+        }
+
+        const table = await prisma.smartTable.update({
+            where: { id, tenantId },
+            data: { status, order, amount, since, waiter }
+        });
+
+        invalidateTablesCache(tenantId);
+        return NextResponse.json({ success: true, table });
+    } catch (error) {
+        return NextResponse.json({ error: "Server error" }, { status: 500 });
+    }
+}
+
+export async function DELETE(request: NextRequest) {
+    try {
+        const tenantId = await getAuthTenantId(request);
+        if (!tenantId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+        const url = new URL(request.url);
+        const section = url.searchParams.get("section");
+        const tableNumber = url.searchParams.get("tableNumber");
+        const id = url.searchParams.get("id");
+
+        if (id) {
+            await prisma.smartTable.deleteMany({ where: { id, tenantId } });
+        } else if (section && tableNumber) {
+            await prisma.smartTable.deleteMany({ where: { section, tableNumber, tenantId } });
+        } else if (section) {
+            await prisma.smartTable.deleteMany({ where: { section, tenantId } });
+        } else {
+            return NextResponse.json({ error: "Missing parameters" }, { status: 400 });
+        }
+
+        invalidateTablesCache(tenantId);
+        return NextResponse.json({ success: true });
+    } catch (error) {
+        return NextResponse.json({ error: "Server error" }, { status: 500 });
+    }
+}

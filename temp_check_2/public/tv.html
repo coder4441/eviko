@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EVIKO – Navbat Ekrani</title>
+    <link id="manifest-link" rel="manifest" href="">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #ffffff;
+            color: #1a1a2e;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* ── HEADER ── */
+        #header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 40px;
+            border-bottom: 5px solid var(--tc, #f97316);
+            background: #fff;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+            flex-shrink: 0;
+        }
+        #header-left { display: flex; align-items: center; gap: 16px; }
+        #logo-box {
+            width: 56px; height: 56px;
+            border-radius: 16px;
+            background: var(--tc, #f97316);
+            color: #fff;
+            font-size: 26px; font-weight: 900;
+            display: flex; align-items: center; justify-content: center;
+        }
+        #shop-name { font-size: 34px; font-weight: 900; color: #111; line-height: 1; }
+        #shop-sub { font-size: 14px; font-weight: 600; color: #9ca3af; margin-top: 4px; }
+        
+        #install-btn {
+            display: none;
+            background: #2563eb;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 800;
+            cursor: pointer;
+            margin-right: 24px;
+            box-shadow: 0 4px 12px rgba(37,99,235,0.25);
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        #install-btn:hover { background: #1d4ed8; transform: scale(1.05); }
+
+        #clock-wrapper { display: flex; align-items: center; }
+        #clock { text-align: right; }
+        #clock-time { font-size: 44px; font-weight: 900; color: #1a1a2e; line-height: 1; font-variant-numeric: tabular-nums; }
+        #clock-date { font-size: 14px; color: #9ca3af; font-weight: 600; margin-top: 4px; }
+
+        /* ── COLUMN HEADERS ── */
+        #col-headers {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            flex-shrink: 0;
+        }
+        .col-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 18px;
+            color: #fff;
+            font-size: 26px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        .col-header.preparing { background: #f59e0b; }
+        .col-header.ready { background: #16a34a; }
+        .col-badge {
+            background: rgba(255,255,255,0.3);
+            color: #fff;
+            font-size: 18px; font-weight: 900;
+            padding: 4px 14px;
+            border-radius: 999px;
+        }
+        .col-icon { font-size: 30px; }
+
+        /* ── MAIN COLUMNS ── */
+        #main {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            flex: 1;
+            overflow: hidden;
+            border-top: 4px solid #f3f4f6;
+        }
+        .column {
+            padding: 24px;
+            overflow-y: auto;
+            height: 100%;
+        }
+        .column.preparing { background: #fffbeb; }
+        .column.ready     { background: #f0fdf4; border-left: 4px solid #d1fae5; }
+
+        /* Grids inside columns */
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; align-content: start; }
+        .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; align-content: start; }
+
+        /* Number cards */
+        .card-preparing {
+            background: #fff;
+            border: 2px solid #fde68a;
+            border-radius: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            aspect-ratio: 1;
+            box-shadow: 0 4px 16px rgba(245,158,11,0.10);
+            transition: transform 0.2s;
+        }
+        .card-preparing:hover { transform: scale(1.04); }
+        .card-preparing span {
+            font-size: clamp(40px, 5vw, 80px);
+            font-weight: 900;
+            color: #1a1a2e;
+            line-height: 1;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .card-ready {
+            background: #22c55e;
+            border: 2px solid #16a34a;
+            border-radius: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            aspect-ratio: 1;
+            box-shadow: 0 6px 24px rgba(34,197,94,0.25);
+            transition: transform 0.2s;
+        }
+        .card-ready.latest {
+            background: #16a34a;
+            border: 4px solid #15803d;
+            box-shadow: 0 8px 32px rgba(22,163,74,0.40);
+            animation: pulse-green 1s ease-in-out infinite alternate;
+            transform: scale(1.06);
+        }
+        .card-ready span {
+            font-size: clamp(48px, 6vw, 96px);
+            font-weight: 900;
+            color: #fff;
+            line-height: 1;
+            font-variant-numeric: tabular-nums;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.18);
+        }
+
+        @keyframes pulse-green {
+            from { box-shadow: 0 8px 24px rgba(22,163,74,0.3); }
+            to   { box-shadow: 0 8px 40px rgba(22,163,74,0.7); }
+        }
+
+        /* Empty state */
+        .empty {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            gap: 16px;
+            opacity: 0.25;
+            padding-top: 40px;
+        }
+        .empty-icon { font-size: 80px; }
+        .empty-text { font-size: 22px; font-weight: 900; text-transform: uppercase; letter-spacing: 3px; }
+
+        /* ── FOOTER TICKER ── */
+        #ticker {
+            background: #111827;
+            color: #d1d5db;
+            padding: 10px 0;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        #ticker-inner {
+            display: inline-block;
+            white-space: nowrap;
+            font-size: 18px;
+            font-weight: 600;
+            animation: marquee 28s linear infinite;
+            padding-left: 100%;
+        }
+        @keyframes marquee {
+            0%   { transform: translateX(0); }
+            100% { transform: translateX(-100%); }
+        }
+
+        /* Scrollbar hide */
+        .column::-webkit-scrollbar { width: 6px; }
+        .column::-webkit-scrollbar-track { background: transparent; }
+        .column::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 99px; }
+    </style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<div id="header">
+    <div id="header-left">
+        <div id="logo-box" id="logo">E</div>
+        <div>
+            <div id="shop-name">EVIKO</div>
+            <div id="shop-sub">Buyurtmalar Navbati</div>
+        </div>
+    </div>
+    <div id="clock-wrapper">
+        <button id="install-btn">⬇️ Ilova qilib o'rnatish</button>
+        <div id="clock">
+            <div id="clock-time">00:00</div>
+            <div id="clock-date">—</div>
+        </div>
+    </div>
+</div>
+
+<!-- ── COLUMN HEADERS ── -->
+<div id="col-headers">
+    <div class="col-header preparing">
+        <span class="col-icon">🕐</span>
+        Tayyorlanmoqda
+        <span class="col-badge" id="preparing-count">0</span>
+    </div>
+    <div class="col-header ready">
+        <span class="col-icon">✅</span>
+        Tayyor!
+        <span class="col-badge" id="ready-count">0</span>
+    </div>
+</div>
+
+<!-- ── MAIN ── -->
+<div id="main">
+    <div class="column preparing" id="col-preparing">
+        <div class="empty">
+            <div class="empty-icon">🕐</div>
+            <div class="empty-text">Buyurtmalar yo'q</div>
+        </div>
+    </div>
+    <div class="column ready" id="col-ready">
+        <div class="empty">
+            <div class="empty-icon">🍽️</div>
+            <div class="empty-text">Kutilmoqda...</div>
+        </div>
+    </div>
+</div>
+
+<!-- ── TICKER ── -->
+<div id="ticker">
+    <span id="ticker-inner">
+        🛎️ &nbsp; Buyurtmangiz raqami YASHIL rangda chiqqanda kassaga yaqinlashing va oling! &nbsp;•&nbsp;
+        ✅ &nbsp; Iltimos, chekingizni ko'rsatib buyurtmani qabul qiling. &nbsp;•&nbsp;
+        🍽️ &nbsp; Yoqimli ishtaha! Xush kelibsiz! &nbsp;•&nbsp;
+        📱 &nbsp; QR kodni skanerlang va menyumiz bilan tanishing. &nbsp;•&nbsp;
+    </span>
+</div>
+
+<script>
+    // ── CONFIG ─────────────────────────────────────────
+    // Ushbu faylni ochishdan oldin SHOP_CODE ni o'zgartiring
+    const SHOP_CODE = new URLSearchParams(window.location.search).get('shop') 
+                      || window.location.pathname.split('/').pop() 
+                      || 'SHOP9923';
+
+    const API_BASE = window.location.origin; // same server
+    let prevReady = [];
+
+    // ── PWA & DYNAMIC MANIFEST ─────────────────────────
+    const manifest = {
+        name: "EVIKO Navbat",
+        short_name: "Navbat",
+        start_url: window.location.href,
+        display: "fullscreen",
+        background_color: "#ffffff",
+        theme_color: "#f97316",
+        icons: [
+            { src: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png" },
+            { src: "/icons/icon-512x512.png", sizes: "512x512", type: "image/png" }
+        ]
+    };
+    const blob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
+    document.getElementById('manifest-link').href = URL.createObjectURL(blob);
+
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js').catch(()=>{});
+        });
+    }
+
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        document.getElementById('install-btn').style.display = 'block';
+    });
+
+    document.getElementById('install-btn').addEventListener('click', async () => {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            if (outcome === 'accepted') {
+                document.getElementById('install-btn').style.display = 'none';
+            }
+            deferredPrompt = null;
+        }
+    });
+
+    // ── CLOCK ──────────────────────────────────────────
+    function updateClock() {
+        const now = new Date();
+        document.getElementById('clock-time').textContent =
+            now.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
+        document.getElementById('clock-date').textContent =
+            now.toLocaleDateString('uz-UZ', { day: '2-digit', month: 'long', year: 'numeric' });
+    }
+    updateClock();
+    setInterval(updateClock, 1000);
+
+    // ── BELL SOUND ─────────────────────────────────────
+    function playBell() {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            [0, 0.3, 0.6].forEach(delay => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(880, ctx.currentTime + delay);
+                osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + delay + 0.6);
+                gain.gain.setValueAtTime(0.8, ctx.currentTime + delay);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + delay + 0.65);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(ctx.currentTime + delay);
+                osc.stop(ctx.currentTime + delay + 0.7);
+            });
+        } catch(e) {}
+    }
+
+    // ── RENDER NUMBERS ─────────────────────────────────
+    function renderPreparing(nums) {
+        const col = document.getElementById('col-preparing');
+        document.getElementById('preparing-count').textContent = nums.length;
+        if (nums.length === 0) {
+            col.innerHTML = '<div class="empty"><div class="empty-icon">🕐</div><div class="empty-text">Buyurtmalar yo\'q</div></div>';
+            return;
+        }
+        const grid = document.createElement('div');
+        grid.className = 'grid-3';
+        nums.forEach(n => {
+            const card = document.createElement('div');
+            card.className = 'card-preparing';
+            card.innerHTML = `<span>${n}</span>`;
+            grid.appendChild(card);
+        });
+        col.innerHTML = '';
+        col.appendChild(grid);
+    }
+
+    function renderReady(nums) {
+        const col = document.getElementById('col-ready');
+        document.getElementById('ready-count').textContent = nums.length;
+        if (nums.length === 0) {
+            col.innerHTML = '<div class="empty"><div class="empty-icon">🍽️</div><div class="empty-text">Kutilmoqda...</div></div>';
+            return;
+        }
+        const grid = document.createElement('div');
+        grid.className = 'grid-2';
+        nums.forEach((n, i) => {
+            const card = document.createElement('div');
+            card.className = 'card-ready' + (i === nums.length - 1 ? ' latest' : '');
+            card.innerHTML = `<span>${n}</span>`;
+            grid.appendChild(card);
+        });
+        col.innerHTML = '';
+        col.appendChild(grid);
+    }
+
+    // ── FETCH QUEUE ────────────────────────────────────
+    async function fetchQueue() {
+        try {
+            const res = await fetch(`${API_BASE}/api/queue/${SHOP_CODE}`);
+            if (!res.ok) return;
+            const data = await res.json();
+
+            // Update shop info
+            if (data.tenant) {
+                const name = data.tenant.shopName || 'EVIKO';
+                document.getElementById('shop-name').textContent = name;
+                document.getElementById('logo-box').textContent = name.charAt(0);
+                document.title = name + ' – Navbat Ekrani';
+                if (data.tenant.themeColor) {
+                    document.documentElement.style.setProperty('--tc', data.tenant.themeColor);
+                    document.querySelectorAll('[id="logo-box"]').forEach(el => {
+                        el.style.background = data.tenant.themeColor;
+                    });
+                    document.getElementById('header').style.borderColor = data.tenant.themeColor;
+                }
+            }
+
+            const preparing = data.preparing || [];
+            const ready = data.ready || [];
+
+            // Bell if new ready orders appeared
+            const added = ready.filter(n => !prevReady.includes(n));
+            if (added.length > 0 && prevReady.length >= 0) {
+                playBell();
+            }
+            prevReady = ready;
+
+            renderPreparing(preparing);
+            renderReady(ready);
+        } catch(e) {
+            console.error('Queue fetch error:', e);
+        }
+    }
+
+    // Initial + polling
+    fetchQueue();
+    setInterval(fetchQueue, 5000);
+</script>
+</body>
+</html>
