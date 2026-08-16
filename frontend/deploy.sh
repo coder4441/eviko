@@ -3,29 +3,24 @@
 echo "-> Frontend papkasiga kirilmoqda..."
 cd /home/evikouz/eviko_new/frontend || exit
 
-echo "-> Eski kutubxonalar o'chirilmoqda..."
+echo "-> Eski fayllar o'chirilmoqda..."
 rm -rf node_modules package-lock.json .next
 
-echo "-> npm cPanel xatolari tozalanmoqda..."
+echo "-> Barcha kutubxonalar o'rnatilmoqda (1-bosqich)..."
 export NODE_ENV=development
-unset NPM_CONFIG_PREFIX
-unset NPM_CONFIG_GLOBAL
+npm install --ignore-scripts
 
-echo "-> O'rnatish yo'li (npm root):"
-npm root
+echo "-> Asosiy kerakli kutubxonalar majburan o'rnatilmoqda (2-bosqich)..."
+npm install next@14.2.5 @prisma/client@5.22.0 prisma@5.22.0 tailwindcss postcss autoprefixer --ignore-scripts
 
-echo "-> Barcha kutubxonalar 0 dan aniq shu papkaga o'rnatilmoqda..."
-npm install --prefix . --include=dev --ignore-scripts --no-package-lock
-
-echo "-> O'rnatilganlar tekshirilmoqda:"
-ls -la node_modules/.bin/next || echo "XATO: next topilmadi!"
-ls -la node_modules/@prisma/client || echo "XATO: @prisma/client topilmadi!"
+echo "-> O'rnatilganlar holati:"
+ls -la node_modules/.bin/next || echo "NEXT topilmadi!"
 
 echo "-> Prisma ulashilmoqda..."
-npx prisma@5.22.0 generate --schema=/home/evikouz/eviko_new/frontend/prisma/schema.prisma
+npx prisma@5.22.0 generate --schema=prisma/schema.prisma
 
-echo "-> Loyiha Build qilinmoqda..."
+echo "-> Loyiha Server uchun qurilmoqda (Build)..."
 export NODE_ENV=production
-npm run build
+npx next build
 
-echo "-> TABRIKLAYMIZ! Barcha qadamlar yakunlandi."
+echo "-> Barcha qadamlar yakunlandi."
