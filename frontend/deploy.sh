@@ -3,24 +3,21 @@
 echo "-> Frontend papkasiga kirilmoqda..."
 cd /home/evikouz/eviko_new/frontend || exit
 
-echo "-> Eski fayllar o'chirilmoqda..."
+echo "-> Eski xato o'rnatilgan kutubxonalar tozalanmoqda..."
 rm -rf node_modules package-lock.json .next
+rm -rf package-lock.json.backup node_modules_old
 
-echo "-> Barcha kutubxonalar o'rnatilmoqda (1-bosqich)..."
+echo "-> npm cPanel xatolari tozalanmoqda..."
 export NODE_ENV=development
-npm install --ignore-scripts
+unset NPM_CONFIG_PREFIX
+unset NPM_CONFIG_GLOBAL
 
-echo "-> Asosiy kerakli kutubxonalar majburan o'rnatilmoqda (2-bosqich)..."
-npm install next@14.2.5 @prisma/client@5.22.0 prisma@5.22.0 tailwindcss postcss autoprefixer --ignore-scripts
+echo "-> Barcha kutubxonalar 0 dan o'rnatilmoqda..."
+# --ignore-scripts olib tashlandi, endi npm tabiiy ishlaydi
+npm install
 
-echo "-> O'rnatilganlar holati:"
-ls -la node_modules/.bin/next || echo "NEXT topilmadi!"
-
-echo "-> Prisma ulashilmoqda..."
-npx prisma@5.22.0 generate --schema=prisma/schema.prisma
-
-echo "-> Loyiha Server uchun qurilmoqda (Build)..."
+echo "-> Loyiha Build qilinmoqda..."
 export NODE_ENV=production
-npx next build
+npm run build
 
-echo "-> Barcha qadamlar yakunlandi."
+echo "-> TABRIKLAYMIZ! Barcha qadamlar muvaffaqiyatli yakunlandi."
