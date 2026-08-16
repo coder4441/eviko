@@ -1,7 +1,7 @@
 "use client";
 
-import { useSuperAdminStore } from "@/lib/superAdminStore";
-import { useAgentStore } from "@/lib/agentStore";
+import { useSuperAdminStore } from "../../../lib/superAdminStore";
+import { useAgentStore } from "../../../lib/agentStore";
 import { Users, Building, Plus, ArrowRight, Wallet, User as UserIcon, Phone as PhoneIcon, MapPin, Key, X, ClipboardList, FileText } from "lucide-react";
 import { PhoneInput } from "@/components/ui/PhoneInput";
 import Link from "next/link";

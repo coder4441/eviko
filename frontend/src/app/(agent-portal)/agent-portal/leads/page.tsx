@@ -1,7 +1,7 @@
 "use client";
 
-import { useSuperAdminStore } from "@/lib/superAdminStore";
-import { useAgentStore } from "@/lib/agentStore";
+import { useSuperAdminStore } from "../../../../lib/superAdminStore";
+import { useAgentStore } from "../../../../lib/agentStore";
 import { useState, useEffect, Suspense } from "react";
 import { Plus, Building, Phone, Clock, FileText, ChevronDown } from "lucide-react";
 import { useSearchParams } from "next/navigation";

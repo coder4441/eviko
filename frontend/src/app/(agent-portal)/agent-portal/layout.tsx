@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Users, Building, LogOut, LayoutDashboard } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useSuperAdminStore } from "@/lib/superAdminStore";
+import { useSuperAdminStore } from "../../../lib/superAdminStore";
 
 export default function AgentPortalLayout({
     children,

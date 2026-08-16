@@ -1,7 +1,7 @@
 "use client";
 
-import { useSuperAdminStore } from "@/lib/superAdminStore";
-import { useAgentStore } from "@/lib/agentStore";
+import { useSuperAdminStore } from "../../../../lib/superAdminStore";
+import { useAgentStore } from "../../../../lib/agentStore";
 import { useEffect } from "react";
 import { Building2, Layers, CheckCircle2, Phone, Calendar } from "lucide-react";
 
