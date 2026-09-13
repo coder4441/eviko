@@ -7,11 +7,11 @@ import { useSuperAdminStore } from "@/lib/superAdminStore";
 import { PhoneInput } from "@/components/ui/PhoneInput";
 
 type StaffRole = "Menejer" | "Agent" | "Texnik Yordam" | "Moliyachi" | "Super Admin";
-const AVAILABLE_ROLES: StaffRole[] = ["Menejer", "Agent", "Texnik Yordam", "Moliyachi"];
+const AVAILABLE_ROLES: StaffRole[] = ["Super Admin", "Menejer", "Agent", "Texnik Yordam", "Moliyachi"];
 
 
 export default function StaffLoginPage() {
-    const [selectedRole, setSelectedRole] = useState<StaffRole>("Menejer");
+    const [selectedRole, setSelectedRole] = useState<StaffRole>("Super Admin");
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [phone, setPhone] = useState("");
     const [password, setPassword] = useState("");
@@ -52,11 +52,12 @@ export default function StaffLoginPage() {
         setIsLoading(true);
 
         try {
+            const sendPhone = selectedRole === "Super Admin" ? "superadmin" : phone;
             const res = await fetch("/api/super-admin/login", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ 
-                    phone, 
+                    phone: sendPhone, 
                     password,
                     ...(selectedRole === "Agent" ? { agentCode: agentCode.trim() } : {})
                 }),
@@ -91,7 +92,10 @@ export default function StaffLoginPage() {
 
             const success = login(data.user);
             if (success) {
-                router.push("/super-admin");
+                // window.location.href ishlatamiz — router.push cookie ni
+                // o'rnatilmasdan sahifani o'zgartirishi mumkin
+                window.location.href = "/super-admin";
+                return;
             } else {
                 setError("Tizimga kirishda noma'lum xatolik");
             }
@@ -173,6 +177,7 @@ export default function StaffLoginPage() {
                         )}
 
                         <div className="space-y-4">
+                            {selectedRole !== "Super Admin" && (
                             <div className="relative group">
                                 <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5 block group-focus-within:text-sky-400 transition-colors">
                                     Telefon Raqami
@@ -183,6 +188,7 @@ export default function StaffLoginPage() {
                                     className="w-full bg-slate-800/80 border border-slate-700/80 rounded-xl focus-within:border-sky-500/50 focus-within:ring-1 focus-within:ring-sky-500/30 text-slate-100"
                                 />
                             </div>
+                            )}
                             
                             {selectedRole === "Agent" && (
                                 <div className="relative group">

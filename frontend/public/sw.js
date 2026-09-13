@@ -34,6 +34,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Skip non-HTTP protocols (e.g. chrome-extension://)
+  if (!url.protocol.startsWith('http')) {
+    return;
+  }
+
   // Skip API routes — always go to network
   if (url.pathname.startsWith('/api/')) {
     return;
@@ -64,13 +69,17 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request).then((cached) => {
       const fetchPromise = fetch(event.request).then((response) => {
-        // Only cache valid 2xx responses
-        if (response && response.status >= 200 && response.status < 300) {
+        // Only cache valid 200 OK responses and explicitly avoid opaque (status 0) or partial (206) responses
+        if (response && response.status === 200 && (response.type === 'basic' || response.type === 'cors')) {
           const cloned = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cloned));
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cloned)).catch(console.error);
         }
         return response;
-      }).catch(() => cached); // Offline: serve from cache if available
+      }).catch((err) => {
+        console.error('SW Fetch error:', err);
+        if (cached) return cached;
+        return new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
+      });
       return cached || fetchPromise;
     })
   );

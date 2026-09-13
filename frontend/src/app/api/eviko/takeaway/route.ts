@@ -79,13 +79,13 @@ export async function POST(request: NextRequest) {
         const auth = await resolveAuth(request);
         if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-        const { name, phone, items, paymentMethod, total, waiterName, customerId } = await request.json();
+        const { name, phone, items, paymentMethod, total, waiterName, customerId, payments } = await request.json();
         if (!Array.isArray(items) || items.length === 0) {
             return NextResponse.json({ error: "Items bo'sh" }, { status: 400 });
         }
 
         const grandTotal  = Math.round(Number(total) || 0);
-        const methodName  = METHOD_MAP[paymentMethod] || paymentMethod || "Naqd pul";
+        const methodName  = payments && payments.length > 0 ? "Aralash" : (METHOD_MAP[paymentMethod] || paymentMethod || "Naqd pul");
         const kassirLabel = waiterName || auth.waiterName || "POS";
         const orderNum    = `TW-${Date.now().toString().slice(-6)}`;
 
@@ -118,18 +118,37 @@ export async function POST(request: NextRequest) {
         });
 
         // 1.b Create Moliya Income record for Takeaway
-        await prisma.kassiHarakat.create({
-            data: {
-                tenantId:   auth.tenantId,
-                type:       "income",
-                category:   "Sotuv tushumi",
-                amount:     grandTotal,
-                description: `Olib ketish (Takeaway). Check: ${tx.id.slice(-6)}`,
-                paymentMethod: methodName,
-                date:       new Date(),
-                createdBy:  kassirLabel,
+        if (payments && payments.length > 0) {
+            for (const p of payments) {
+                if (p.amount > 0) {
+                    await prisma.kassiHarakat.create({
+                        data: {
+                            tenantId:   auth.tenantId,
+                            type:       "income",
+                            category:   "Sotuv tushumi",
+                            amount:     p.amount,
+                            description: `Olib ketish (Takeaway). Check: ${tx.id.slice(-6)}`,
+                            paymentMethod: METHOD_MAP[p.method] || p.method,
+                            date:       new Date(),
+                            createdBy:  kassirLabel,
+                        }
+                    });
+                }
             }
-        });
+        } else {
+            await prisma.kassiHarakat.create({
+                data: {
+                    tenantId:   auth.tenantId,
+                    type:       "income",
+                    category:   "Sotuv tushumi",
+                    amount:     grandTotal,
+                    description: `Olib ketish (Takeaway). Check: ${tx.id.slice(-6)}`,
+                    paymentMethod: methodName,
+                    date:       new Date(),
+                    createdBy:  kassirLabel,
+                }
+            });
+        }
 
         // 2. Transaction items + stock deduction
         for (const ci of items as { item: any; qty: number }[]) {

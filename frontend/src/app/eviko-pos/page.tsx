@@ -202,10 +202,15 @@ interface CartItem { item: MenuItem; qty: number; selectedModifiers?: Record<str
 interface Shot { id: number; label: string; cart: CartItem[]; isPaid: boolean; paymentMethod?: string; }
 interface TableShotState { shots: Shot[]; activeShot: number; }
 
-function PayModal({ total, onPay, onClose, loading, servicePct = 0 }: { total: number; onPay: (m: string, customerId?: string) => void; onClose: () => void; loading: boolean; servicePct?: number }) {
+function PayModal({ total, onPay, onClose, loading, servicePct = 0 }: { total: number; onPay: (m: string, customerId?: string, payments?: {method: string; amount: number}[]) => void; onClose: () => void; loading: boolean; servicePct?: number }) {
     const { lang, dark } = usePos();
     const [method, setMethod] = useState("cash");
     const [given, setGiven] = useState("");
+    const [mixedMode, setMixedMode] = useState(false);
+    const [mixPayments, setMixPayments] = useState<{method: string; amount: string}[]>([
+        { method: "cash", amount: "" },
+        { method: "card", amount: "" },
+    ]);
     
     // Qarz states
     const [customers, setCustomers] = useState<any[]>([]);
@@ -246,9 +251,18 @@ function PayModal({ total, onPay, onClose, loading, servicePct = 0 }: { total: n
 
     const grand = Math.round(total * (1 + servicePct / 100));
     const change = method === "cash" ? Math.max(0, Number(given.replace(/\s/g, "")) - grand) : 0;
-    const canPay = !loading && selCustId !== "" && (
-        (method === "cash" && Number(given.replace(/\s/g, "")) >= grand) || 
-        (method !== "cash")
+
+    // Mixed mode calculations
+    const mixTotal = mixPayments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+    const mixRemaining = grand - mixTotal;
+    const mixChange = Math.max(0, mixTotal - grand);
+    const mixCashRow = mixPayments.find(p => p.method === "cash");
+    const mixCashAmount = Number(mixCashRow?.amount || 0);
+
+    const canPay = !loading && (method === "qarz" ? selCustId !== "" : true) && (
+        mixedMode
+            ? mixRemaining <= 0
+            : (method === "cash" ? Number(given.replace(/\s/g, "")) >= grand : true)
     );
     
     // Combine standard, custom, and qarz
@@ -262,83 +276,225 @@ function PayModal({ total, onPay, onClose, loading, servicePct = 0 }: { total: n
         { id: "qarz", label: "Qarzga yopish", icon: Users }
     ];
 
+    const MIX_METHODS = [
+        { id: "cash", label: "Naqd", icon: Banknote },
+        { id: "card", label: "Karta", icon: CreditCard },
+        ...customMethods,
+    ];
+
     const QUICK = [50000, 100000, 200000, 500000];
     const filteredCust = customers.filter(c => c.name.toLowerCase().includes(searchCust.toLowerCase()) || (c.phone && c.phone.includes(searchCust)));
 
+    const handleConfirm = () => {
+        if (mixedMode) {
+            const payments = mixPayments
+                .filter(p => Number(p.amount) > 0)
+                .map(p => ({ method: p.method, amount: Number(p.amount) }));
+            // Primary method = largest payment
+            const primary = payments.sort((a, b) => b.amount - a.amount)[0]?.method || "cash";
+            onPay(primary, selCustId || undefined, payments);
+        } else {
+            onPay(method, selCustId || undefined);
+        }
+    };
+
     return (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <div className={`w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border ${dark ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"}`}>
-                <div className="p-5 text-white" style={{ background: dark ? "linear-gradient(135deg, #065f46, #0f766e)" : "linear-gradient(135deg, #10b981, #0d9488)" }}>
-                    <div className="flex justify-between items-center mb-3">
-                        <div className="flex items-center gap-2 font-bold text-lg"><Receipt size={20} /> To'lov</div>
-                        <button onClick={onClose} disabled={loading} className="p-1.5 rounded-full hover:bg-white/20"><X size={20} /></button>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in duration-200">
+            <div className={`w-full max-w-lg rounded-[28px] shadow-2xl overflow-hidden border flex flex-col ${dark ? "bg-[#0f172a] border-slate-800" : "bg-white border-slate-100"}`}>
+                
+                {/* ─── PREMIUM HEADER & TOTAL DISPLAY ─── */}
+                <div className="relative px-8 pt-8 pb-6">
+                    <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
+                        <button
+                            onClick={() => setMixedMode(v => !v)}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${mixedMode ? (dark ? "bg-indigo-500/20 text-indigo-400 border border-indigo-500/30" : "bg-indigo-50 text-indigo-600 border border-indigo-200") : (dark ? "bg-slate-800 text-slate-400 border border-slate-700 hover:text-slate-200" : "bg-gray-100 text-gray-500 border border-gray-200 hover:text-gray-800")}`}
+                        >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                            Aralash
+                        </button>
+                        <button onClick={onClose} disabled={loading} className={`p-1.5 rounded-full transition-colors ${dark ? "bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-black"}`}>
+                            <X size={18} strokeWidth={2.5}/>
+                        </button>
                     </div>
-                    <div className="text-center cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setGiven(String(grand))}>
-                        <p className="text-emerald-100 text-sm mb-1">Jami ({servicePct > 0 ? `${servicePct}% xizmat` : 'xizmatsiz'})</p>
-                        <p className="text-4xl font-black">{fmt(grand)} <span className="text-2xl text-emerald-200">so'm</span></p>
+
+                    <div className="text-center relative z-0">
+                        <p className={`text-sm font-semibold tracking-wide uppercase mb-2 ${dark ? "text-slate-400" : "text-gray-400"}`}>To'lov summasi {servicePct > 0 ? `(${servicePct}% xizmat bilan)` : ''}</p>
+                        <div className="flex items-baseline justify-center gap-2">
+                            <span className={`text-[46px] leading-none font-black tracking-tight ${dark ? "text-white" : "text-gray-900"}`}>{fmt(grand)}</span>
+                            <span className={`text-xl font-bold ${dark ? "text-slate-500" : "text-gray-400"}`}>UZS</span>
+                        </div>
+                        {mixedMode && mixTotal > 0 && (
+                            <div className="mt-4 flex items-center justify-center gap-4 text-sm font-semibold bg-indigo-500/10 py-2 rounded-xl border border-indigo-500/20">
+                                <span className={`${mixRemaining > 0 ? (dark ? 'text-amber-400' : 'text-amber-600') : (dark ? 'text-emerald-400' : 'text-emerald-600')}`}>
+                                    {mixRemaining > 0 ? `Qoldi: ${fmt(mixRemaining)} UZS` : `✓ To'liq kiritildi`}
+                                </span>
+                                {mixChange > 0 && <span className={`${dark ? "text-indigo-300" : "text-indigo-600"}`}>Qaytim: {fmt(mixChange)}</span>}
+                            </div>
+                        )}
                     </div>
                 </div>
-                <div className="p-5 space-y-4">
-                    <div className="grid grid-cols-3 gap-2">
-                        {METHODS.map((m, i) => (
-                            <button key={i} onClick={() => setMethod(m.id)}
-                                className={`flex flex-col items-center justify-center gap-2 py-3 px-1 rounded-xl border-2 font-semibold text-xs text-center transition-all ${method === m.id ? (dark ? "border-emerald-500 bg-emerald-900/40 text-emerald-400" : "border-emerald-500 bg-emerald-50 text-emerald-700") : (dark ? "border-slate-700 text-slate-400 hover:border-emerald-500/30 hover:text-emerald-500" : "border-gray-200 text-gray-500 hover:border-emerald-500/30 hover:text-emerald-600")}`}>
-                                <m.icon size={20} />{m.label}
-                            </button>
-                        ))}
-                    </div>
+
+                {/* ─── DIVIDER ─── */}
+                <div className={`mx-8 h-px ${dark ? "bg-gradient-to-r from-transparent via-slate-700 to-transparent" : "bg-gradient-to-r from-transparent via-gray-200 to-transparent"}`} />
+
+                {/* ─── BODY ─── */}
+                <div className="p-8 space-y-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
                     
-                    {method === "cash" && (
-                        <div className="animate-fade-in">
-                            <label className={`text-xs font-semibold mb-1.5 block ${dark ? "text-slate-400" : "text-gray-500"}`}>Berilgan pul</label>
-                            <input type="number" value={given} onChange={e => setGiven(e.target.value)} placeholder="0" autoFocus
-                                className={`w-full border-2 rounded-xl px-4 py-3 text-2xl font-bold text-right focus:outline-none transition-colors ${dark ? "bg-slate-800 border-slate-700 text-slate-100 placeholder-slate-600 focus:border-emerald-500" : "border-gray-200 text-gray-800 focus:border-emerald-400"}`} />
-                            <div className="grid grid-cols-4 gap-2 mt-2">
-                                {QUICK.map(q => <button key={q} onClick={() => setGiven(String(q))} className={`py-2 rounded-lg border text-xs font-bold transition-colors ${dark ? "bg-slate-800 border-slate-700 text-slate-400 hover:bg-emerald-900/40 hover:border-emerald-500 hover:text-emerald-400" : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200"}`}>{fmt(q)}</button>)}
+                    {/* ── ARALASH TO'LOV MODE ── */}
+                    {mixedMode ? (
+                        <div className="space-y-4">
+                            {mixPayments.map((p, i) => {
+                                const mInfo = MIX_METHODS.find(m => m.id === p.method) || MIX_METHODS[0];
+                                return (
+                                    <div key={i} className={`flex items-center gap-3 p-2 rounded-2xl border transition-all ${dark ? "bg-[#1e293b] border-slate-700 focus-within:border-indigo-500/50" : "bg-gray-50 border-gray-200 focus-within:border-indigo-300 focus-within:bg-white focus-within:shadow-sm"}`}>
+                                        <select
+                                            value={p.method}
+                                            onChange={e => {
+                                                const updated = [...mixPayments];
+                                                updated[i] = { ...updated[i], method: e.target.value };
+                                                setMixPayments(updated);
+                                            }}
+                                            className={`appearance-none font-bold text-sm rounded-xl px-4 py-3 outline-none cursor-pointer border-r ${dark ? "bg-transparent text-slate-200 border-slate-700" : "bg-transparent text-gray-700 border-gray-200"}`}
+                                        >
+                                            {MIX_METHODS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+                                        </select>
+                                        <input
+                                            type="number"
+                                            placeholder="0"
+                                            value={p.amount}
+                                            onChange={e => {
+                                                const updated = [...mixPayments];
+                                                updated[i] = { ...updated[i], amount: e.target.value };
+                                                setMixPayments(updated);
+                                            }}
+                                            className={`flex-1 px-3 py-3 bg-transparent text-right font-black text-xl outline-none ${dark ? "text-white placeholder-slate-600" : "text-gray-900 placeholder-gray-300"}`}
+                                        />
+                                        {i === mixPayments.length - 1 && mixRemaining > 0 && (
+                                            <button onClick={() => {
+                                                const updated = [...mixPayments];
+                                                updated[i] = { ...updated[i], amount: String(mixRemaining + (Number(updated[i].amount) || 0)) };
+                                                setMixPayments(updated);
+                                            }} className={`mr-2 px-3 py-2 rounded-xl text-xs font-black transition-colors ${dark ? "bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/40" : "bg-indigo-50 text-indigo-600 hover:bg-indigo-100"}`}>
+                                                Kiritish
+                                            </button>
+                                        )}
+                                        {mixPayments.length > 2 && (
+                                            <button onClick={() => setMixPayments(mixPayments.filter((_, idx) => idx !== i))} className="mr-2 p-2 rounded-xl text-red-400 hover:bg-red-500/10">
+                                                <X size={16} />
+                                            </button>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                            <button
+                                onClick={() => setMixPayments([...mixPayments, { method: "card", amount: "" }])}
+                                className={`w-full py-4 rounded-2xl border-2 border-dashed text-sm font-bold flex items-center justify-center gap-2 transition-all ${dark ? "border-slate-700 text-slate-400 hover:border-indigo-500/50 hover:text-indigo-400 hover:bg-indigo-500/5" : "border-gray-200 text-gray-400 hover:border-indigo-300 hover:text-indigo-500 hover:bg-indigo-50/50"}`}
+                            >
+                                <Plus size={16}/> Qo'shimcha to'lov turi
+                            </button>
+                        </div>
+                    ) : (
+                        /* ── ODDIY TO'LOV MODE ── */
+                        <div className="space-y-6">
+                            <div className="grid grid-cols-3 gap-3">
+                                {METHODS.map((m, i) => {
+                                    const isActive = method === m.id;
+                                    return (
+                                        <button key={i} onClick={() => setMethod(m.id)}
+                                            className={`relative flex flex-col items-center justify-center gap-3 p-4 rounded-2xl border-2 transition-all duration-200 ${isActive ? (dark ? "border-indigo-500 bg-indigo-500/10 shadow-[0_0_20px_rgba(99,102,241,0.15)]" : "border-indigo-500 bg-indigo-50 shadow-[0_4px_20px_rgba(99,102,241,0.15)]") : (dark ? "border-slate-800 bg-[#1e293b] hover:border-slate-600" : "border-gray-100 bg-gray-50 hover:border-gray-300")}`}>
+                                            <div className={`p-2 rounded-xl ${isActive ? (dark ? "bg-indigo-500/20 text-indigo-400" : "bg-indigo-100 text-indigo-600") : (dark ? "bg-slate-800 text-slate-400" : "bg-white text-gray-400 shadow-sm")}`}>
+                                                <m.icon size={22} strokeWidth={isActive ? 2.5 : 2} />
+                                            </div>
+                                            <span className={`font-bold text-[13px] ${isActive ? (dark ? "text-white" : "text-indigo-900") : (dark ? "text-slate-400" : "text-gray-500")}`}>{m.label}</span>
+                                            {isActive && <div className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-indigo-500 border-2 border-white flex items-center justify-center"><Check size={10} className="text-white" strokeWidth={4}/></div>}
+                                        </button>
+                                    );
+                                })}
                             </div>
-                            {Number(given.replace(/\s/g, "")) > 0 && (
-                                <div className={`mt-3 p-3 rounded-xl border text-center animate-slide-up ${dark ? "bg-emerald-900/30 border-emerald-800/50" : "bg-emerald-50 border-emerald-100"}`}>
-                                    <p className={`text-xs ${dark ? "text-emerald-400" : "text-emerald-600"}`}>Qaytim</p>
-                                    <p className={`text-2xl font-black ${dark ? "text-emerald-300" : "text-emerald-700"}`}>{fmt(change)} so'm</p>
+                            
+                            {method === "cash" && (
+                                <div className="animate-in slide-in-from-bottom-2 duration-300 space-y-4">
+                                    <div className="relative">
+                                        <div className={`absolute inset-y-0 left-4 flex items-center pointer-events-none ${dark ? "text-slate-500" : "text-gray-400"}`}>
+                                            <Banknote size={20} />
+                                        </div>
+                                        <input type="number" value={given} onChange={e => setGiven(e.target.value)} placeholder="0" autoFocus
+                                            className={`w-full border-2 rounded-2xl pl-12 pr-6 py-4 text-3xl font-black text-right outline-none transition-all ${dark ? "bg-[#1e293b] border-slate-700 text-white placeholder-slate-700 focus:border-indigo-500 focus:bg-[#1e293b]" : "bg-gray-50 border-gray-100 text-gray-900 placeholder-gray-300 focus:border-indigo-400 focus:bg-white focus:shadow-[0_4px_20px_rgba(99,102,241,0.05)]"}`} />
+                                    </div>
+                                    <div className="grid grid-cols-4 gap-2">
+                                        {QUICK.map(q => <button key={q} onClick={() => setGiven(String(q))} className={`py-2.5 rounded-xl border text-xs font-bold transition-all ${dark ? "bg-[#1e293b] border-slate-700 text-slate-300 hover:bg-slate-800 hover:border-slate-500" : "bg-white border-gray-100 text-gray-600 shadow-sm hover:border-gray-300 hover:shadow"}`}>{fmt(q)}</button>)}
+                                    </div>
+                                    {Number(given.replace(/\s/g, "")) > 0 && (
+                                        <div className={`flex items-center justify-between p-4 rounded-2xl border animate-in fade-in duration-300 ${dark ? "bg-emerald-500/10 border-emerald-500/20" : "bg-emerald-50 border-emerald-100"}`}>
+                                            <p className={`font-semibold text-sm ${dark ? "text-emerald-400" : "text-emerald-600"}`}>Qaytim:</p>
+                                            <p className={`text-2xl font-black tracking-tight ${dark ? "text-emerald-300" : "text-emerald-700"}`}>{fmt(change)} <span className="text-sm font-bold opacity-70">UZS</span></p>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
                     )}
 
-                    <div className="space-y-3 animate-fade-in border-t border-slate-200/20 pt-4 mt-2">
-                        <div className="flex items-center justify-between">
-                            <label className={`text-xs font-semibold ${dark ? "text-slate-400" : "text-gray-500"}`}>Mijozni tanlang (Majburiy)</label>
-                            <button onClick={() => setShowAddCust(!showAddCust)} className={`text-xs font-bold flex items-center gap-1 hover:opacity-80 ${dark ? "text-emerald-400" : "text-emerald-600"}`}><Plus size={14}/> {showAddCust ? "Bekor qilish" : "Qo'shish"}</button>
-                        </div>
-                        
-                        {showAddCust && (
-                            <div className={`p-3 rounded-xl border space-y-2 mb-2 animate-slide-up ${dark ? "bg-slate-800 border-emerald-500/50" : "bg-gray-50 border-emerald-200"}`}>
-                                <input className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none ${dark ? "bg-slate-900 border-slate-700 text-slate-200 focus:border-emerald-500" : "border-gray-300 focus:border-emerald-500"}`} placeholder="Mijoz ismi" value={newCustName} onChange={e => setNewCustName(e.target.value)} />
-                                <input className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none ${dark ? "bg-slate-900 border-slate-700 text-slate-200 focus:border-emerald-500" : "border-gray-300 focus:border-emerald-500"}`} placeholder="Telefon (ixtiyoriy)" value={newCustPhone} onChange={e => setNewCustPhone(e.target.value)} />
-                                <button onClick={handleCreateCustomer} disabled={loadingCust} className="w-full py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold rounded-lg transition-colors">{loadingCust ? "Saqlanmoqda..." : "Saqlash va Tanlash"}</button>
+                    {/* Mijoz tanlash (qarz uchun) */}
+                    {method === "qarz" && (
+                        <div className={`animate-in slide-in-from-bottom-2 duration-300 pt-4 border-t ${dark ? "border-slate-800" : "border-gray-100"}`}>
+                            <div className="flex items-center justify-between mb-3">
+                                <label className={`text-[11px] font-black uppercase tracking-wider ${dark ? "text-slate-500" : "text-gray-400"}`}>
+                                    Qarzni yozish uchun mijoz tanlang (Majburiy)
+                                </label>
+                                <button onClick={() => setShowAddCust(!showAddCust)} className={`text-[11px] font-bold px-2.5 py-1 rounded-lg transition-colors ${dark ? "bg-slate-800 text-slate-300 hover:bg-slate-700" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+                                    {showAddCust ? "Bekor qilish" : "+ Yangi mijoz"}
+                                </button>
                             </div>
-                        )}
-                        
-                        {!showAddCust && (
-                            <>
-                                <input type="text" placeholder="Ism yoki raqam..." className={`w-full border-2 rounded-xl px-3 py-2 text-sm focus:outline-none transition-colors ${dark ? "bg-slate-800 border-slate-700 text-slate-200 placeholder-slate-500 focus:border-emerald-500" : "border-gray-200 text-gray-800 focus:border-emerald-400"}`} value={searchCust} onChange={e => setSearchCust(e.target.value)} />
-                                <div className="max-h-32 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
-                                    {filteredCust.length === 0 ? <p className={`text-xs text-center py-4 ${dark ? "text-slate-500" : "text-gray-400"}`}>Mijoz topilmadi</p> : filteredCust.map(c => (
-                                        <div key={c.id} onClick={() => setSelCustId(c.id)} className={`p-2 rounded-lg border cursor-pointer transition-colors ${selCustId === c.id ? (dark ? 'border-emerald-500 bg-emerald-900/40' : 'border-emerald-500 bg-emerald-50') : (dark ? 'border-slate-700 hover:border-emerald-500/50' : 'border-gray-100 hover:border-emerald-500/30')}`}>
-                                            <p className={`text-sm font-bold ${dark ? "text-slate-200" : "text-gray-800"}`}>{c.name}</p>
-                                            <p className={`text-xs font-mono ${dark ? "text-slate-500" : "text-gray-500"}`}>{c.phone || "Telefon no'm. kiritilmagan"}</p>
-                                        </div>
-                                    ))}
+                            
+                            {showAddCust ? (
+                                <div className={`p-4 rounded-2xl border space-y-3 animate-in fade-in zoom-in-95 ${dark ? "bg-[#1e293b] border-slate-700" : "bg-gray-50 border-gray-200"}`}>
+                                    <input className={`w-full px-4 py-3 rounded-xl text-sm font-semibold outline-none transition-all ${dark ? "bg-[#0f172a] border border-slate-700 text-white focus:border-indigo-500" : "bg-white border border-gray-200 text-gray-900 focus:border-indigo-400 focus:shadow-sm"}`} placeholder="Mijoz ismi" value={newCustName} onChange={e => setNewCustName(e.target.value)} />
+                                    <input className={`w-full px-4 py-3 rounded-xl text-sm font-semibold outline-none transition-all ${dark ? "bg-[#0f172a] border border-slate-700 text-white focus:border-indigo-500" : "bg-white border border-gray-200 text-gray-900 focus:border-indigo-400 focus:shadow-sm"}`} placeholder="Telefon raqami" value={newCustPhone} onChange={e => setNewCustPhone(e.target.value)} />
+                                    <button onClick={handleCreateCustomer} disabled={loadingCust} className={`w-full py-3 text-white text-sm font-black rounded-xl transition-all shadow-lg ${dark ? "bg-indigo-600 hover:bg-indigo-500 shadow-indigo-900/50" : "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200"}`}>{loadingCust ? "Saqlanmoqda..." : "Saqlash va Tanlash"}</button>
                                 </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    <input type="text" placeholder="Ism yoki raqam bo'yicha qidirish..." className={`w-full rounded-2xl px-4 py-3 text-sm font-semibold outline-none transition-all ${dark ? "bg-[#1e293b] border border-slate-700 text-white placeholder-slate-500 focus:border-indigo-500" : "bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 focus:border-indigo-400 focus:bg-white"}`} value={searchCust} onChange={e => setSearchCust(e.target.value)} />
+                                    <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1 custom-scrollbar">
+                                        {filteredCust.length === 0 ? <p className={`text-xs font-semibold text-center py-6 ${dark ? "text-slate-500" : "text-gray-400"}`}>Mijoz topilmadi</p> : filteredCust.map(c => (
+                                            <div key={c.id} onClick={() => setSelCustId(c.id)} className={`px-4 py-3 rounded-xl border-2 cursor-pointer transition-all flex items-center justify-between ${selCustId === c.id ? (dark ? 'border-indigo-500 bg-indigo-500/10' : 'border-indigo-500 bg-indigo-50') : (dark ? 'border-transparent bg-[#1e293b] hover:border-slate-700' : 'border-transparent bg-gray-50 hover:border-gray-200')}`}>
+                                                <p className={`text-sm font-bold ${dark ? "text-white" : "text-gray-900"}`}>{c.name}</p>
+                                                <p className={`text-[11px] font-bold px-2 py-1 rounded-md ${dark ? "bg-slate-800 text-slate-400" : "bg-gray-200 text-gray-500"}`}>{c.phone || "No'mer yo'q"}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+                
+                {/* ─── ACTION FOOTER ─── */}
+                <div className={`p-6 pt-0 ${dark ? "" : ""}`}>
+                    <button onClick={handleConfirm} disabled={!canPay}
+                        className={`group relative w-full py-4 rounded-2xl text-white font-black text-lg flex items-center justify-center gap-3 overflow-hidden transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed ${canPay ? 'active:scale-[0.98]' : ''}`}
+                        style={{
+                            background: dark 
+                                ? (canPay ? "linear-gradient(135deg, #10b981, #059669)" : "#334155") 
+                                : (canPay ? "linear-gradient(135deg, #10b981, #059669)" : "#e2e8f0"),
+                            boxShadow: canPay ? (dark ? "0 10px 25px -5px rgba(16, 185, 129, 0.3)" : "0 10px 25px -5px rgba(16, 185, 129, 0.4)") : "none"
+                        }}
+                    >
+                        {canPay && <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out" />}
+                        {loading ? (
+                            <div className="w-6 h-6 border-[3px] border-white/30 border-t-white rounded-full animate-spin" />
+                        ) : (
+                            <>
+                                <CheckCircle size={24} className="relative z-10" /> 
+                                <span className="relative z-10">
+                                    {mixedMode ? `To'lash (${fmt(mixTotal)})` : "To'lovni tasdiqlash"}
+                                </span>
                             </>
                         )}
-                    </div>
-
-                    <button onClick={() => onPay(method, selCustId)} disabled={!canPay}
-                        className={`w-full py-4 rounded-xl text-white font-black text-lg shadow-lg disabled:opacity-40 flex items-center justify-center gap-2 active:scale-[0.98] transition-all ${dark ? "bg-gradient-to-r from-emerald-600 to-teal-600 shadow-emerald-900/50" : "bg-gradient-to-r from-emerald-500 to-teal-500 shadow-emerald-200"}`}>
-                        {loading ? <div className="w-6 h-6 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <><CheckCircle size={22} /> Tasdiqlash</>}
                     </button>
                 </div>
+
             </div>
         </div>
     );
@@ -358,7 +514,7 @@ const MENU_CACHE_TTL = 30 * 1000; // 30 soniya — admin panelidan yangi taomlar
 // ─── Menu Panel ─────────────────────────────────────────────────────────────────
 function MenuPanel({ onConfirm, onPay, kassirPrinterIp, autoPrintReceipt, instantAdd, servicePct = 0, tableName = "Buyurtma" }: {
     onConfirm: (cart: CartItem[]) => Promise<void>;
-    onPay: (cart: CartItem[], method: string, customerId?: string) => Promise<void>;
+    onPay: (cart: CartItem[], method: string, customerId?: string, payments?: {method: string; amount: number}[]) => Promise<void>;
     kassirPrinterIp?: string;
     autoPrintReceipt?: boolean;
     instantAdd?: boolean;
@@ -576,13 +732,13 @@ function MenuPanel({ onConfirm, onPay, kassirPrinterIp, autoPrintReceipt, instan
     };
 
     // To'lov — final payment, clears cart + prints customer receipt
-    const handlePay = async (method: string, customerId?: string) => {
+    const handlePay = async (method: string, customerId?: string, payments?: {method: string; amount: number}[]) => {
         setLoading(true);
         setPrintError(null);
 
         // — To'lov va printer IP bir vaqtda parallel bajariladi
         const [, printerData] = await Promise.all([
-            onPay(cart, method, customerId),
+            onPay(cart, method, customerId, payments),
             // Agar preloaded IP bo'lmasa, hozir yuklash (parallel, kutish yo'q)
             (!_preloadedPrinterIp && !kassirPrinterIp)
                 ? fetch("/api/eviko/printers").then(r => r.ok ? r.json() : null).catch(() => null)
@@ -1217,7 +1373,8 @@ export default function UbtPosPage() {
     const tables = store.smartTables;
     const waiterName = store.kassirSession?.name ?? "Xodim";
     const _sess = store.kassirSession || (store as any).deviceSession;
-    const _perms = _sess?.permissions || [];
+    const _rawPerms = _sess?.permissions || [];
+    const _perms: string[] = Array.isArray(_rawPerms) ? _rawPerms : (typeof _rawPerms === "string" ? (() => { try { return JSON.parse(_rawPerms); } catch { return []; } })() : []);
     const hasPaymentPerm = ["Administrator", "Manablog"].includes((_sess as any)?.role) || _sess?.id === "admin" || !_sess || _perms.includes("acceptCash") || _perms.includes("Kassir");
     const hasVoidPerm = ["Administrator", "Manablog"].includes((_sess as any)?.role) || _sess?.id === "admin" || !_sess || _perms.includes("refunds") || _perms.includes("Menejer");
     const hasDiscountPerm = ["Administrator", "Manablog"].includes((_sess as any)?.role) || _sess?.id === "admin" || !_sess || _perms.includes("discounts");
@@ -1255,7 +1412,8 @@ export default function UbtPosPage() {
         const sess = store.kassirSession || store.deviceSession;
         if (sess?.id === "admin") return;
 
-        const perms = sess?.permissions || [];
+        const rawPerms = sess?.permissions || [];
+        const perms: string[] = Array.isArray(rawPerms) ? rawPerms : (typeof rawPerms === "string" ? (() => { try { return JSON.parse(rawPerms); } catch { return []; } })() : []);
         const hasAnyOrderType = perms.some(p => ["zal", "delivery", "takeaway"].includes(p));
         const canZal = perms.includes("zal") || !hasAnyOrderType;
         const canDelivery = perms.includes("delivery") || !hasAnyOrderType;
@@ -1297,9 +1455,11 @@ export default function UbtPosPage() {
 
     useEffect(() => {
         fetchReservations();
+        fetchCurrentShift();
         const intv = setInterval(fetchReservations, 30000); // 30 soniya (avval 2 daqiqa edi)
         return () => clearInterval(intv);
     }, [fetchReservations]);
+
 
     const handleCancelRes = useCallback((resId: string) => {
         if (!window.confirm("Tanlangan bronni bekor qilasizmi yoki yopasizmi? (Ekranda o'chadi)")) return;
@@ -1442,11 +1602,12 @@ export default function UbtPosPage() {
     };
 
     // ─── Order types ───────────────────────────────────────────────────────────
-    type LocalOrder = { id: number; num: number; total: number; name: string; phone: string; addr?: string; time: string; status: "pending" | "done"; items: CartItem[]; };
+    type LocalOrder = { id: number; num: number; total: number; name: string; phone: string; addr?: string; time: string; status: "pending" | "delivering" | "done"; courierId?: string; courierName?: string; items: CartItem[]; };
 
     // ─── Takeaway orders — DB-backed (+ localStorage fallback during session) ──
     const [twOrders, setTwOrders] = useState<LocalOrder[]>([]);
     const [dlOrders, setDlOrders] = useState<LocalOrder[]>([]);
+    const [couriers, setCouriers] = useState<{id: string, name: string, role: string}[]>([]);
     const twCounterRef = useRef(1);
 
     // Sync twOrders to localStorage to prevent data loss on page refresh
@@ -1466,7 +1627,7 @@ export default function UbtPosPage() {
 
     // saveTwOrders: POST paid takeaway order to DB (Transaction). Does NOT refresh local list —
     // local pending orders are managed in session state via setTwOrders directly.
-    const saveTwOrders = async (cartItems: CartItem[], custName: string, custPhone: string, payMethod: string, customerId?: string) => {
+    const saveTwOrders = async (cartItems: CartItem[], custName: string, custPhone: string, payMethod: string, customerId?: string, payments?: {method: string; amount: number}[]) => {
         const token = store.kassirSession?.token || store.deviceSession?.token;
         const hdrs: Record<string, string> = { "Content-Type": "application/json" };
         if (token) hdrs["Authorization"] = `Bearer ${token}`;
@@ -1478,6 +1639,7 @@ export default function UbtPosPage() {
                     name: custName, phone: custPhone,
                     items: cartItems,
                     paymentMethod: payMethod,
+                    payments,
                     customerId,
                     total,
                     waiterName: store.kassirSession?.name,
@@ -1489,7 +1651,7 @@ export default function UbtPosPage() {
     };
 
     // saveDlOrders: POST to /api/eviko/yetkazish then update local state
-    const saveDlOrders = async (cartItems: CartItem[], custName: string, custPhone: string, custAddr: string, payMethod: string, customerId?: string) => {
+    const saveDlOrders = async (cartItems: CartItem[], custName: string, custPhone: string, custAddr: string, payMethod: string, customerId?: string, payments?: {method: string; amount: number}[]) => {
         const token = store.kassirSession?.token || store.deviceSession?.token;
         const hdrs: Record<string, string> = { "Content-Type": "application/json" };
         if (token) hdrs["Authorization"] = `Bearer ${token}`;
@@ -1502,6 +1664,7 @@ export default function UbtPosPage() {
                     items: cartItems.filter((c: any) => c?.item).map((c: any) => ({ name: c.item.name, qty: c.qty, price: c.item.price })),
                     totalAmount: total,
                     paymentMethod: payMethod,
+                    payments,
                     customerId,
                 }),
             });
@@ -1538,6 +1701,95 @@ export default function UbtPosPage() {
     const [transferStep, setTransferStep] = useState<"auth" | "pick">("auth");
     
     // ─── Tayyorlash vaqti (Preparation Time) state (REMOVED) ─────────────────────────────
+
+    // ─── Smena Boshqaruvi (Cash Shift Management) ────────────────────────────────
+    const [currentShift, setCurrentShift] = useState<any>(null);
+    const [showOpenShift, setShowOpenShift] = useState(false);
+    const [showCloseShift, setShowCloseShift] = useState(false);
+    const [shiftInitialCash, setShiftInitialCash] = useState("");
+    const [shiftActualCash, setShiftActualCash] = useState("");
+    const [shiftLoading, setShiftLoading] = useState(false);
+    const [shiftChecked, setShiftChecked] = useState(false);
+
+    const fetchCurrentShift = async () => {
+        const token = store.kassirSession?.token || store.deviceSession?.token;
+        const hdrs: Record<string, string> = {};
+        if (token) hdrs["Authorization"] = `Bearer ${token}`;
+        try {
+            const res = await fetch("/api/eviko/shifts/current", { headers: hdrs });
+            const data = await res.json();
+            setCurrentShift(data.shift || null);
+        } catch {}
+        setShiftChecked(true);
+    };
+
+    const handleOpenShift = async () => {
+        setShiftLoading(true);
+        const token = store.kassirSession?.token || store.deviceSession?.token;
+        const hdrs: Record<string, string> = { "Content-Type": "application/json" };
+        if (token) hdrs["Authorization"] = `Bearer ${token}`;
+        try {
+            const res = await fetch("/api/eviko/shifts/open", {
+                method: "POST", headers: hdrs,
+                body: JSON.stringify({
+                    initialCash: parseFloat(shiftInitialCash) || 0,
+                    staffName: store.kassirSession?.name || store.deviceSession?.name || "Kassir"
+                })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setCurrentShift(data.shift);
+                setShowOpenShift(false);
+                setShiftInitialCash("");
+            } else {
+                alert(data.error || "Xatolik yuz berdi");
+            }
+        } catch {}
+        setShiftLoading(false);
+    };
+
+    const handleCloseShift = async () => {
+        setShiftLoading(true);
+        const token = store.kassirSession?.token || store.deviceSession?.token;
+        const hdrs: Record<string, string> = { "Content-Type": "application/json" };
+        if (token) hdrs["Authorization"] = `Bearer ${token}`;
+        try {
+            const res = await fetch("/api/eviko/shifts/close", {
+                method: "POST", headers: hdrs,
+                body: JSON.stringify({
+                    shiftId: currentShift?.id,
+                    actualCash: parseFloat(shiftActualCash) || 0
+                })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setCurrentShift(null);
+                setShowCloseShift(false);
+                setShiftActualCash("");
+                // Show Z-report summary
+                const s = data.shift;
+                const dur = s.endTime && s.startTime
+                    ? Math.round((new Date(s.endTime).getTime() - new Date(s.startTime).getTime()) / 60000)
+                    : 0;
+                alert(`✅ SMENA YOPILDI (Z-OTCHYOT)\n\n` +
+                    `📅 Davomiyligi: ${Math.floor(dur/60)}h ${dur%60}m\n` +
+                    `💰 Savdo jami: ${fmt(s.salesTotal)}\n` +
+                    `🏦 Naqd pul: ${fmt(s.salesTotal - s.cardTotal - s.mixedTotal)}\n` +
+                    `💳 Terminal: ${fmt(s.cardTotal)}\n` +
+                    `🔀 Aralash: ${fmt(s.mixedTotal)}\n` +
+                    `📤 Xarajatlar: ${fmt(s.expensesTotal)}\n` +
+                    `─────────────────\n` +
+                    `🧾 Kutilgan naqd: ${fmt(s.expectedCash)}\n` +
+                    `💵 Haqiqiy naqd: ${fmt(s.actualCash)}\n` +
+                    `${s.difference >= 0 ? "✅" : "❌"} Farq: ${s.difference >= 0 ? "+" : ""}${fmt(s.difference)}`
+                );
+            } else {
+                alert(data.error || "Xatolik yuz berdi");
+            }
+        } catch {}
+        setShiftLoading(false);
+    };
+
 
     useEffect(() => {
         if (!selTable) setIsSaboyMode(false);
@@ -1945,6 +2197,10 @@ export default function UbtPosPage() {
                     ? data.orders.filter((o: any) => o.status !== "delivered" && o.status !== "cancelled")
                     : [];
 
+                if (Array.isArray(data.couriers)) {
+                    setCouriers(data.couriers);
+                }
+
                 if (activeOrders.length > prevCountRef.current.dl) playBeep();
                 prevCountRef.current.dl = activeOrders.length;
 
@@ -1956,7 +2212,9 @@ export default function UbtPosPage() {
                     phone: o.customerPhone ?? o.phone ?? "",
                     addr: o.address ?? o.addr ?? "",
                     time: o.createdAt ? new Date(o.createdAt).toLocaleTimeString("uz-UZ", { hour: "2-digit", minute: "2-digit" }) : (o.time ?? ""),
-                    status: "pending" as const,
+                    status: (o.status === "new" ? "pending" : o.status) as any,
+                    courierId: o.courierId,
+                    courierName: o.courierName,
                     items: normalizeItems(typeof o.items === "string" ? JSON.parse(o.items) : (o.items ?? [])),
                 })));
             }
@@ -2634,10 +2892,24 @@ export default function UbtPosPage() {
                     </span>
                 </div>
 
-                {/* CENTER: Beautiful Digital Clock */}
-                <div className="flex-1 flex items-center justify-center pointer-events-none">
+                {/* CENTER: Beautiful Digital Clock + Shift Status */}
+                <div className="flex-1 flex items-center justify-center gap-3 pointer-events-none">
                     <ClockWidget dark={dark} />
+                    {shiftChecked && (
+                        <div className={`pointer-events-auto flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border cursor-pointer transition-all
+                            ${currentShift
+                                ? "bg-emerald-500/15 text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/25"
+                                : "bg-red-500/15 text-red-400 border-red-500/30 hover:bg-red-500/25"
+                            }`}
+                            onClick={() => currentShift ? setShowCloseShift(true) : setShowOpenShift(true)}
+                            title={currentShift ? "Smena ochiq — Z-Otchyot chiqarish" : "Smena yopiq — Smenani ochish"}
+                        >
+                            <span className={`w-1.5 h-1.5 rounded-full ${currentShift ? "bg-emerald-400 animate-pulse" : "bg-red-400"}`} />
+                            {currentShift ? "Smena ochiq" : "Smena yopiq"}
+                        </div>
+                    )}
                 </div>
+
 
 
             </header>
@@ -2655,7 +2927,8 @@ export default function UbtPosPage() {
                         const sess = store.kassirSession || store.deviceSession;
                         if (sess?.id === "admin") return true; 
 
-                        const perms = sess?.permissions || [];
+                        const rawPerms2 = sess?.permissions || [];
+                        const perms: string[] = Array.isArray(rawPerms2) ? rawPerms2 : (typeof rawPerms2 === "string" ? (() => { try { return JSON.parse(rawPerms2); } catch { return []; } })() : []);
                         const hasAnyOrderType = perms.some(p => ["zal", "delivery", "takeaway"].includes(p));
                         const canZal = perms.includes("zal") || !hasAnyOrderType;
                         const canDelivery = perms.includes("delivery") || !hasAnyOrderType;
@@ -2730,6 +3003,19 @@ export default function UbtPosPage() {
                                                     <span>📊</span> KUNLIK OTCHOT
                                                 </button>
                                             )}
+                                            {/* Smena tugmalari */}
+                                            {(((store.kassirSession as any)?.role === "Kassir" || store.kassirSession?.permissions?.includes("Kassir")) || store.kassirSession?.id === "admin") && (
+                                                currentShift ? (
+                                                    <button onClick={() => { setShowProfileMenu(false); setShowCloseShift(true); }} className={`w-full text-left px-3 py-2.5 text-sm font-bold rounded-lg transition-colors flex items-center gap-2 text-red-500 hover:bg-red-50`}>
+                                                        <span>🔒</span> SMENANI YOPISH (Z-OTCHYOT)
+                                                    </button>
+                                                ) : (
+                                                    <button onClick={() => { setShowProfileMenu(false); setShowOpenShift(true); }} className={`w-full text-left px-3 py-2.5 text-sm font-bold rounded-lg transition-colors flex items-center gap-2 text-emerald-600 hover:bg-emerald-50`}>
+                                                        <span>🟢</span> SMENANI OCHISH
+                                                    </button>
+                                                )
+                                            )}
+
                                             {(((store.kassirSession as any)?.role === "Ofitsiant" || store.kassirSession?.permissions?.includes("Ofitsiant")) || store.kassirSession?.id === "admin") && (
                                                 <button onClick={handleOpenZakaz} className={`w-full text-left px-3 py-2.5 text-sm font-bold rounded-lg transition-colors flex items-center gap-2 ${dark ? "text-gray-200 hover:bg-gray-700" : "text-gray-700 hover:bg-gray-100"}`}>
                                                     <span>🍽️</span> MENING ZAKAZLARIM
@@ -2948,7 +3234,7 @@ export default function UbtPosPage() {
                                                 store.fetchSmartTables();
                                             }}
 
-                                            onPay={async (cart, method, customerId) => {
+                                            onPay={async (cart, method, customerId, payments) => {
                                                 const token = store.kassirSession?.token || store.deviceSession?.token;
                                                 const hdrs: Record<string, string> = { "Content-Type": "application/json" };
                                                 if (token) hdrs["Authorization"] = `Bearer ${token}`;
@@ -2958,6 +3244,7 @@ export default function UbtPosPage() {
                                                         tableId: selTable.id,
                                                         items: cart.filter((c: any) => c?.item).map((c: any) => ({ menuItemId: c.item.id, name: c.item.name, qty: c.qty, price: c.item.price })),
                                                         paymentMethod: method,
+                                                        payments,
                                                         customerId,
                                                         total: Math.round(cart.reduce((s, c) => s + c.item.price * c.qty, 0)),
                                                         waiterName: store.kassirSession?.name,
@@ -2984,7 +3271,7 @@ export default function UbtPosPage() {
 
 
                                     {/* RIGHT: Receipt + action buttons */}
-                                    <div className={`w-full lg:w-[340px] h-auto lg:h-full shrink-0 flex flex-col lg:border-l z-20 transition-all duration-300 ${dark ? "bg-[#080f1c] border-white/[0.06]" : "bg-white border-slate-100"}`}>
+                                    <div className={`w-full lg:w-[420px] h-auto lg:h-full shrink-0 flex flex-col lg:border-l z-20 transition-all duration-300 ${dark ? "bg-[#080f1c] border-white/[0.06]" : "bg-white border-slate-100"}`}>
 
                                         {/* Table info header — premium minimal */}
                                         <div className={`px-4 py-3 border-b shrink-0 flex items-center justify-between ${dark ? "border-white/[0.06]" : "border-slate-100"}`}>
@@ -3508,7 +3795,7 @@ export default function UbtPosPage() {
                                         />
                                     </div>
                                     {/* RIGHT: receipt + actions */}
-                                    <div className={`w-[300px] shrink-0 flex flex-col border-l ${th.border(dark)} ${th.panel(dark)}`}>
+                                    <div className={`w-[450px] shrink-0 flex flex-col border-l ${th.border(dark)} ${th.panel(dark)}`}>
                                         <div className="flex-1 overflow-y-auto">
                                             <div className="px-3 pt-3">
                                                 <p className={`text-[9px] font-black uppercase tracking-widest text-center mb-2 ${th.sub(dark)}`}>· · · BUYURTMA TARKIBI · · ·</p>
@@ -3550,7 +3837,7 @@ export default function UbtPosPage() {
                                         </div>
                                         {/* Action buttons */}
                                         <div className={`shrink-0 border-t px-3 py-3 flex flex-col gap-2 ${th.border(dark)}`}>
-                                            <div className="grid grid-cols-3 gap-2">
+                                            <div className="grid grid-cols-2 gap-2">
                                                 <button onClick={() => handlePrintClientReceiptHelper(newOrderCart, `Olib ketish${custName ? ' (' + custName + ')' : ''}`)} className={`flex flex-col items-center gap-1.5 py-3 rounded-xl border transition ${dark ? "bg-emerald-900/30 border-emerald-800/50 hover:bg-emerald-800/50" : "bg-emerald-50 border-emerald-200 hover:bg-emerald-100"}`}>
                                                     <div className="w-8 h-8 rounded-xl bg-emerald-500 flex items-center justify-center shadow-sm"><Receipt size={15} className="text-white"/></div>
                                                     <p className={`text-[10px] font-black ${dark ? "text-emerald-400" : "text-emerald-700"}`}>Chek</p>
@@ -3558,10 +3845,6 @@ export default function UbtPosPage() {
                                                 <button className={`flex flex-col items-center gap-1.5 py-3 rounded-xl border transition ${dark ? "bg-purple-900/30 border-purple-800/50 hover:bg-purple-800/50" : "bg-purple-50 border-purple-200 hover:bg-purple-100"}`}>
                                                     <div className="w-8 h-8 rounded-xl bg-purple-500 flex items-center justify-center shadow-sm"><Users size={15} className="text-white"/></div>
                                                     <p className={`text-[10px] font-black ${dark ? "text-purple-400" : "text-purple-700"}`}>Tip</p>
-                                                </button>
-                                                <button className={`flex flex-col items-center gap-1.5 py-3 rounded-xl border transition ${dark ? "bg-amber-900/30 border-amber-800/50 hover:bg-amber-800/50" : "bg-amber-50 border-amber-200 hover:bg-amber-100"}`}>
-                                                    <div className="w-8 h-8 rounded-xl bg-amber-500 flex items-center justify-center shadow-sm"><Clock size={15} className="text-white"/></div>
-                                                    <p className={`text-[10px] font-black ${dark ? "text-amber-400" : "text-amber-700"}`}>{fmtSec().slice(0,5)}</p>
                                                 </button>
                                             </div>
                                             <div className="grid grid-cols-2 gap-2">
@@ -3604,9 +3887,9 @@ export default function UbtPosPage() {
                                         total={newOrderCart.reduce((s, c) => s + c.item.price * c.qty, 0)}
                                         loading={false}
                                         onClose={() => setNewOrderPaying(false)}
-                                        onPay={async (method, customerId) => {
+                                        onPay={async (method, customerId, payments) => {
                                             // Create Transaction in DB (records the payment)
-                                            await saveTwOrders(newOrderCart, custName, custPhone, method, customerId);
+                                            await saveTwOrders(newOrderCart, custName, custPhone, method, customerId, payments);
                                             setNewOrderCart([]); setCustName(""); setCustPhone("");
                                             setNewOrderPaying(false); setShowTwMenu(false);
                                             // NOTE: No pending list entry was added (user went straight to payment),
@@ -3640,8 +3923,8 @@ export default function UbtPosPage() {
                         </div>
                         {/* Orders grid */}
                         <div className="flex-1 overflow-y-auto p-4">
-                            {/* Faqat pending (yetkazilmagan) orderlarni ko'rsatamiz */}
-                            {dlOrders.filter(o => o.status === "pending").length === 0 ? (
+                            {/* Faqat pending va delivering (yetkazilmagan) orderlarni ko'rsatamiz */}
+                            {dlOrders.filter(o => o.status !== "done").length === 0 ? (
                                 <div className="flex flex-col items-center justify-center h-full gap-4">
                                     <div className={`w-20 h-20 rounded-3xl flex items-center justify-center ${dark ? "bg-purple-900/40" : "bg-purple-50"}`}>
                                         <Bike size={40} className="text-purple-200" />
@@ -3655,18 +3938,23 @@ export default function UbtPosPage() {
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-                                    {dlOrders.filter(o => o.status === "pending").map(o => (
+                                    {dlOrders.filter(o => o.status !== "done").map(o => (
                                         <button key={o.id} onClick={() => setSelOrder(o)}
                                             className={`p-3 rounded-2xl border-2 text-left transition-all hover:scale-[1.02] active:scale-[0.98] shadow-sm
-                                                ${o.status === "done" ? (dark ? "bg-gray-800 border-emerald-900 shadow-none" : "bg-white border-emerald-200") : (dark ? "bg-gray-800 border-amber-900 shadow-none" : "bg-white border-amber-200")}`}>
+                                                ${o.status === "done" ? (dark ? "bg-gray-800 border-emerald-900 shadow-none" : "bg-white border-emerald-200") : 
+                                                  o.status === "delivering" ? (dark ? "bg-gray-800 border-purple-900 shadow-none" : "bg-white border-purple-200") :
+                                                  (dark ? "bg-gray-800 border-amber-900 shadow-none" : "bg-white border-amber-200")}`}>
                                             <div className="flex items-center justify-between mb-2">
                                                 <span className={`font-black text-lg ${th.label(dark)}`}>#{o.num}</span>
-                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${o.status === "done" ? (dark ? "bg-emerald-900 text-emerald-300" : "bg-emerald-100 text-emerald-700") : (dark ? "bg-amber-900 text-amber-300" : "bg-amber-100 text-amber-800")}`}>
-                                                    {o.status === "done" ? "Yetkazildi" : "Yetkazilmoqda"}
+                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${o.status === "done" ? (dark ? "bg-emerald-900 text-emerald-300" : "bg-emerald-100 text-emerald-700") : 
+                                                    o.status === "delivering" ? (dark ? "bg-purple-900 text-purple-300" : "bg-purple-100 text-purple-700") :
+                                                    (dark ? "bg-amber-900 text-amber-300" : "bg-amber-100 text-amber-800")}`}>
+                                                    {o.status === "done" ? "Yetkazildi" : (o.status === "delivering" ? "Yetkazilmoqda" : "Kutilmoqda")}
                                                 </span>
                                             </div>
                                             <p className={`text-xs flex items-center gap-1 mb-0.5 ${th.label(dark)}`}><User size={10}/> {o.name || "Mijoz"}</p>
                                             {o.addr && <p className={`text-xs flex items-center gap-1 mb-0.5 ${th.sub(dark)}`}><MapPin size={10}/> {o.addr}</p>}
+                                            {o.courierName && <p className={`text-xs flex items-center gap-1 mb-0.5 ${th.sub(dark)}`}><Bike size={10}/> {o.courierName}</p>}
                                             <p className={`text-xs flex items-center gap-1 mb-2 ${th.sub(dark)}`}><Clock size={10}/> {o.time}</p>
                                             <p className="font-black text-purple-600 text-sm">{fmt(o.total)} <span className="text-[10px] font-semibold text-gray-400">so&apos;m</span></p>
                                         </button>
@@ -3708,7 +3996,7 @@ export default function UbtPosPage() {
                                         />
                                     </div>
                                     {/* RIGHT: receipt + actions */}
-                                    <div className={`w-[300px] shrink-0 flex flex-col border-l ${th.border(dark)} ${th.panel(dark)}`}>
+                                    <div className={`w-[450px] shrink-0 flex flex-col border-l ${th.border(dark)} ${th.panel(dark)}`}>
                                         <div className="flex-1 overflow-y-auto">
                                             <div className="px-3 pt-3">
                                                 <p className={`text-[9px] font-black uppercase tracking-widest text-center mb-2 ${th.sub(dark)}`}>· · · BUYURTMA TARKIBI · · ·</p>
@@ -3750,7 +4038,7 @@ export default function UbtPosPage() {
                                         </div>
                                         {/* Action buttons */}
                                         <div className={`shrink-0 border-t px-3 py-3 flex flex-col gap-2 ${th.border(dark)}`}>
-                                            <div className="grid grid-cols-3 gap-2">
+                                            <div className="grid grid-cols-2 gap-2">
                                                 <button onClick={() => handlePrintClientReceiptHelper(newOrderCart, `Yetkazib berish${custName ? ' (' + custName + ')' : ''}`)} className={`flex flex-col items-center gap-1.5 py-3 rounded-xl border transition ${dark ? "bg-emerald-900/30 border-emerald-800/50 hover:bg-emerald-800/50" : "bg-emerald-50 border-emerald-200 hover:bg-emerald-100"}`}>
                                                     <div className="w-8 h-8 rounded-xl bg-emerald-500 flex items-center justify-center shadow-sm"><Receipt size={15} className="text-white"/></div>
                                                     <p className={`text-[10px] font-black ${dark ? "text-emerald-400" : "text-emerald-700"}`}>Chek</p>
@@ -3758,10 +4046,6 @@ export default function UbtPosPage() {
                                                 <button className={`flex flex-col items-center gap-1.5 py-3 rounded-xl border transition ${dark ? "bg-purple-900/30 border-purple-800/50 hover:bg-purple-800/50" : "bg-purple-50 border-purple-200 hover:bg-purple-100"}`}>
                                                     <div className="w-8 h-8 rounded-xl bg-purple-500 flex items-center justify-center shadow-sm"><Users size={15} className="text-white"/></div>
                                                     <p className={`text-[10px] font-black ${dark ? "text-purple-400" : "text-purple-700"}`}>Tip</p>
-                                                </button>
-                                                <button className={`flex flex-col items-center gap-1.5 py-3 rounded-xl border transition ${dark ? "bg-amber-900/30 border-amber-800/50 hover:bg-amber-800/50" : "bg-amber-50 border-amber-200 hover:bg-amber-100"}`}>
-                                                    <div className="w-8 h-8 rounded-xl bg-amber-500 flex items-center justify-center shadow-sm"><Clock size={15} className="text-white"/></div>
-                                                    <p className={`text-[10px] font-black ${dark ? "text-amber-400" : "text-amber-700"}`}>{fmtSec().slice(0,5)}</p>
                                                 </button>
                                             </div>
                                             <div className="grid grid-cols-2 gap-2">
@@ -3791,9 +4075,9 @@ export default function UbtPosPage() {
                                         total={newOrderCart.reduce((s, c) => s + c.item.price * c.qty, 0)}
                                         loading={false}
                                         onClose={() => setNewOrderPaying(false)}
-                                        onPay={async (method, customerId) => {
+                                        onPay={async (method, customerId, payments) => {
                                             const total = Math.round(newOrderCart.reduce((s, c) => s + c.item.price * c.qty, 0));
-                                            await saveDlOrders(newOrderCart, custName, custPhone, custAddr, method, customerId);
+                                            await saveDlOrders(newOrderCart, custName, custPhone, custAddr, method, customerId, payments);
                                             setNewOrderCart([]); setCustName(""); setCustPhone(""); setCustAddr("");
                                             setNewOrderPaying(false); setShowDlMenu(false);
                                         }}
@@ -3909,7 +4193,7 @@ export default function UbtPosPage() {
                             </div>
 
                             {/* RIGHT: Receipt + action buttons */}
-                            <div className={`w-[300px] shrink-0 flex flex-col border-l ${th.border(dark)} ${th.panel(dark)}`}>
+                            <div className={`w-[450px] shrink-0 flex flex-col border-l ${th.border(dark)} ${th.panel(dark)}`}>
                                 {/* Items list */}
                                 <div className="flex-1 overflow-y-auto">
                                     <div className="px-3 pt-3">
@@ -3990,7 +4274,39 @@ export default function UbtPosPage() {
 
                                 {/* Action buttons */}
                                 <div className={`shrink-0 border-t px-3 py-3 flex flex-col gap-2 ${th.border(dark)}`}>
-                                    <div className="grid grid-cols-3 gap-2">
+                                    {!twOrders.some((o: any) => o.id === selOrder.id) && (
+                                        <div className={`p-3 rounded-xl border ${dark ? "bg-gray-800 border-gray-700" : "bg-gray-50 border-gray-200"}`}>
+                                            <label className={`block text-[11px] font-black uppercase tracking-wider mb-1.5 ${th.sub(dark)}`}>Kuryer tayinlash</label>
+                                            <select 
+                                                value={selOrder.courierId || ""}
+                                                onChange={(e) => {
+                                                    const cId = e.target.value;
+                                                    const courier = couriers.find((c: any) => String(c.id) === cId);
+                                                    const cName = courier ? courier.name : undefined;
+                                                    
+                                                    const updateSel = (prev: any) => ({ ...prev, courierId: cId || undefined, courierName: cName, status: cId ? "delivering" : "pending" });
+                                                    setSelOrder(updateSel);
+                                                    setDlOrders((p: any) => p.map((x: any) => x.id === selOrder.id ? updateSel(x) : x));
+
+                                                    const token = (store.kassirSession as any)?.token || (store.deviceSession as any)?.token;
+                                                    const hdrs: Record<string, string> = { "Content-Type": "application/json" };
+                                                    if (token) hdrs["Authorization"] = `Bearer ${token}`;
+                                                    fetch("/api/eviko/yetkazish", { 
+                                                        method: "PATCH", 
+                                                        headers: hdrs, 
+                                                        body: JSON.stringify({ id: String(selOrder.id), courierId: cId || null, courierName: cName || null, status: cId ? "delivering" : "pending" })
+                                                    }).catch(()=>null);
+                                                }}
+                                                className={`w-full text-sm font-bold p-2.5 rounded-xl border outline-none transition cursor-pointer appearance-none ${dark ? "bg-gray-900 border-gray-700 text-gray-200 focus:border-purple-500" : "bg-white border-gray-300 focus:border-purple-500"}`}
+                                            >
+                                                <option value="">-- Kuryer tanlanmagan --</option>
+                                                {couriers.map((c: any) => (
+                                                    <option key={c.id} value={c.id}>{c.name} {c.role === "Courier" ? "(Kuryer)" : ""}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
+                                    <div className="grid grid-cols-2 gap-2">
                                         <button onClick={() => handlePrintClientReceiptHelper(selOrder.items, `Yandex (${selOrder.name || 'Mijoz'})`)} className={`flex flex-col items-center gap-1.5 py-3 rounded-xl border transition ${dark ? "bg-emerald-900/30 border-emerald-800/50 hover:bg-emerald-800/50" : "bg-emerald-50 border-emerald-200 hover:bg-emerald-100"}`}>
                                             <div className="w-8 h-8 rounded-xl bg-emerald-500 flex items-center justify-center shadow-sm"><Receipt size={15} className="text-white"/></div>
                                             <p className={`text-[10px] font-black ${dark ? "text-emerald-400" : "text-emerald-700"}`}>Chek</p>
@@ -3998,10 +4314,6 @@ export default function UbtPosPage() {
                                         <button className={`flex flex-col items-center gap-1.5 py-3 rounded-xl border transition ${dark ? "bg-purple-900/30 border-purple-800/50 hover:bg-purple-800/50" : "bg-purple-50 border-purple-200 hover:bg-purple-100"}`}>
                                             <div className="w-8 h-8 rounded-xl bg-purple-500 flex items-center justify-center shadow-sm"><Users size={15} className="text-white"/></div>
                                             <p className={`text-[10px] font-black ${dark ? "text-purple-400" : "text-purple-700"}`}>Tip</p>
-                                        </button>
-                                        <button className={`flex flex-col items-center gap-1.5 py-3 rounded-xl border transition ${dark ? "bg-amber-900/30 border-amber-800/50 hover:bg-amber-800/50" : "bg-amber-50 border-amber-200 hover:bg-amber-100"}`}>
-                                            <div className="w-8 h-8 rounded-xl bg-amber-500 flex items-center justify-center shadow-sm"><Clock size={15} className="text-white"/></div>
-                                            <p className={`text-[10px] font-black ${dark ? "text-amber-400" : "text-amber-700"}`}>{selOrder.time}</p>
                                         </button>
                                     </div>
                                     <div className="grid grid-cols-2 gap-2">
@@ -4030,7 +4342,7 @@ export default function UbtPosPage() {
                                 total={selOrder.total}
                                 loading={false}
                                 onClose={() => setPayingOrder(false)}
-                                onPay={async (method, customerId) => {
+                                onPay={async (method, customerId, payments) => {
                                     const isTw = twOrders.some(o => o.id === selOrder.id);
                                     const token = store.kassirSession?.token || store.deviceSession?.token;
                                     const hdrs: Record<string, string> = { "Content-Type": "application/json" };
@@ -4038,7 +4350,7 @@ export default function UbtPosPage() {
                                     try {
                                         if (isTw) {
                                             // Takeaway pending order: create Transaction via takeaway API
-                                            await saveTwOrders(selOrder.items, selOrder.name, selOrder.phone, method, customerId);
+                                            await saveTwOrders(selOrder.items, selOrder.name, selOrder.phone, method, customerId, payments);
                                         } else {
                                             // Delivery order: pay via pay API + update delivery status
                                             const payRes = await fetch("/api/eviko/pay", {
@@ -4047,6 +4359,7 @@ export default function UbtPosPage() {
                                                     tableId: null,
                                                     items: selOrder.items.filter((c: any) => c?.item).map((c: any) => ({ menuItemId: c.item.id, name: c.item.name, qty: c.qty, price: c.item.price })),
                                                     paymentMethod: method,
+                                                    payments,
                                                     customerId,
                                                     total: Math.round(selOrder.total),
                                                     orderType: "delivery",
@@ -4457,6 +4770,126 @@ export default function UbtPosPage() {
                 </div>
             )}
         </div>
+
+            {/* ── SMENA OCHISH MODALI ──────────────────────────────────────────── */}
+            {showOpenShift && (
+                <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
+                    <div className={`w-[420px] max-w-[95vw] rounded-2xl shadow-2xl border overflow-hidden ${dark ? "bg-slate-900 border-slate-700 text-slate-100" : "bg-white border-slate-200 text-slate-800"}`}>
+                        {/* Header */}
+                        <div className="bg-gradient-to-r from-emerald-500 to-green-600 px-6 py-4 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-xl">🟢</div>
+                                <div>
+                                    <p className="text-white font-black text-[16px] leading-none">Smenani Ochish</p>
+                                    <p className="text-emerald-100 text-[11px] mt-0.5">Kassir smena boshlanmoqda</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowOpenShift(false)} className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition">
+                                <span className="text-lg leading-none">&times;</span>
+                            </button>
+                        </div>
+                        {/* Body */}
+                        <div className="px-6 py-5 space-y-4">
+                            <div>
+                                <label className={`block text-[11px] font-bold uppercase tracking-widest mb-2 ${dark ? "text-slate-400" : "text-slate-500"}`}>
+                                    💵 Kassadagi boshlang'ich naqd pul (so'm)
+                                </label>
+                                <input
+                                    type="number"
+                                    value={shiftInitialCash}
+                                    onChange={e => setShiftInitialCash(e.target.value)}
+                                    placeholder="0"
+                                    autoFocus
+                                    className={`w-full h-12 px-4 rounded-xl border text-[18px] font-black outline-none transition focus:ring-2 focus:ring-emerald-500/40 ${dark ? "bg-slate-800 border-slate-600 text-white placeholder-slate-600" : "bg-slate-50 border-slate-200 text-slate-800"}`}
+                                    onKeyDown={e => { if (e.key === "Enter") handleOpenShift(); }}
+                                />
+                            </div>
+                            <div className={`px-3 py-2.5 rounded-xl text-[12px] font-medium ${dark ? "bg-slate-800 text-slate-400" : "bg-slate-50 text-slate-500"}`}>
+                                ℹ️ Smena ochilgandan so'ng barcha sotuvlar shu smenaga bog'lanadi. Z-Otchyot chiqarishda bu summa hisobga olinadi.
+                            </div>
+                        </div>
+                        {/* Footer */}
+                        <div className={`px-6 py-4 border-t flex gap-3 ${dark ? "border-slate-700" : "border-slate-100"}`}>
+                            <button onClick={() => setShowOpenShift(false)} className={`flex-1 h-11 rounded-xl text-sm font-bold transition-colors ${dark ? "bg-slate-800 text-slate-300 hover:bg-slate-700" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
+                                Bekor qilish
+                            </button>
+                            <button onClick={handleOpenShift} disabled={shiftLoading}
+                                className="flex-1 h-11 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-black transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
+                                {shiftLoading ? <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg> : "🟢"}
+                                SMENANI BOSHLASH
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── SMENANI YOPISH (Z-OTCHYOT) MODALI ───────────────────────────── */}
+            {showCloseShift && (
+                <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
+                    <div className={`w-[480px] max-w-[95vw] rounded-2xl shadow-2xl border overflow-hidden ${dark ? "bg-slate-900 border-slate-700 text-slate-100" : "bg-white border-slate-200 text-slate-800"}`}>
+                        {/* Header */}
+                        <div className="bg-gradient-to-r from-red-500 to-rose-600 px-6 py-4 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-xl">📋</div>
+                                <div>
+                                    <p className="text-white font-black text-[16px] leading-none">Smenani Yopish</p>
+                                    <p className="text-rose-100 text-[11px] mt-0.5">Z-Otchyot · {currentShift?.staffName || "Kassir"}</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowCloseShift(false)} className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition">
+                                <span className="text-lg leading-none">&times;</span>
+                            </button>
+                        </div>
+                        {/* Body */}
+                        <div className="px-6 py-5 space-y-4">
+                            {/* Shift info */}
+                            {currentShift && (
+                                <div className={`px-4 py-3 rounded-xl border ${dark ? "bg-slate-800 border-slate-700" : "bg-slate-50 border-slate-200"}`}>
+                                    <div className="flex items-center justify-between mb-1">
+                                        <span className={`text-[11px] font-bold uppercase tracking-widest ${dark ? "text-slate-500" : "text-slate-400"}`}>Smena boshlangan</span>
+                                        <span className={`text-sm font-bold ${dark ? "text-slate-200" : "text-slate-700"}`}>
+                                            {new Date(currentShift.startTime).toLocaleTimeString("uz-UZ", { hour: "2-digit", minute: "2-digit" })}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className={`text-[11px] font-bold uppercase tracking-widest ${dark ? "text-slate-500" : "text-slate-400"}`}>Boshlang'ich naqd</span>
+                                        <span className={`text-sm font-bold ${dark ? "text-emerald-400" : "text-emerald-600"}`}>{fmt(currentShift.initialCash)}</span>
+                                    </div>
+                                </div>
+                            )}
+                            <div>
+                                <label className={`block text-[11px] font-bold uppercase tracking-widest mb-2 ${dark ? "text-slate-400" : "text-slate-500"}`}>
+                                    💵 Kassadagi haqiqiy naqd pul (so'm)
+                                </label>
+                                <input
+                                    type="number"
+                                    value={shiftActualCash}
+                                    onChange={e => setShiftActualCash(e.target.value)}
+                                    placeholder="0"
+                                    autoFocus
+                                    className={`w-full h-12 px-4 rounded-xl border text-[18px] font-black outline-none transition focus:ring-2 focus:ring-red-500/40 ${dark ? "bg-slate-800 border-slate-600 text-white placeholder-slate-600" : "bg-slate-50 border-slate-200 text-slate-800"}`}
+                                    onKeyDown={e => { if (e.key === "Enter") handleCloseShift(); }}
+                                />
+                            </div>
+                            <div className={`px-3 py-2.5 rounded-xl text-[12px] font-medium border ${dark ? "bg-amber-950/30 border-amber-900/40 text-amber-300" : "bg-amber-50 border-amber-100 text-amber-700"}`}>
+                                ⚠️ Smenani yopgandan so'ng barcha savdolar hisoblanadi va Z-Otchyot ko'rsatiladi. Bu amalni qaytarib bo'lmaydi.
+                            </div>
+                        </div>
+                        {/* Footer */}
+                        <div className={`px-6 py-4 border-t flex gap-3 ${dark ? "border-slate-700" : "border-slate-100"}`}>
+                            <button onClick={() => setShowCloseShift(false)} className={`flex-1 h-11 rounded-xl text-sm font-bold transition-colors ${dark ? "bg-slate-800 text-slate-300 hover:bg-slate-700" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
+                                Bekor qilish
+                            </button>
+                            <button onClick={handleCloseShift} disabled={shiftLoading}
+                                className="flex-1 h-11 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-black transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
+                                {shiftLoading ? <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg> : "🔒"}
+                                SMENANI YOPISH
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
     </PosCtx.Provider>
     );
 }

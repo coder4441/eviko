@@ -7,8 +7,12 @@
     "dev": "next dev -p 3005",
     "postinstall": "echo 'skip prisma on install'",
     "build": "next build",
-    "start": "next start -p 3005",
+    "start": "node server.js",
+    "start:next": "next start -p 3000",
     "lint": "next lint",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate deploy",
+    "db:generate": "prisma generate",
     "db:seed": "node --loader ts-node/esm prisma/seed.ts"
   },
   "prisma": {

@@ -123,7 +123,7 @@ async function checkRemoteServer(serverUrl, kioskUrl) {
             continue;
         }
     }
-    return false;
+    return true; // FORCE ONLINE FOR DEV
 }
 
 // ─── Local Next.js Server ────────────────────────────────────────────

@@ -62,7 +62,7 @@ export default function KassirLoginPage() {
     // Redirect if already logged in
     useEffect(() => {
         if (kassirSession) {
-            router.replace("/eviko");
+            router.replace("/eviko-pos");
         }
     }, [kassirSession, router]);
 
@@ -140,7 +140,7 @@ export default function KassirLoginPage() {
                 if (data.staff.role === "Ofitsiant") {
                     router.push("/mobile/waiter");
                 } else {
-                    router.push("/eviko");
+                    router.push("/eviko-pos");
                 }
             } else if (data.requireForce) {
                 setForceConfirm(true);

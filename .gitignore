@@ -22,11 +22,12 @@ frontend/prisma/*.db-journal
 *.db
 *.db-journal
 
-# Env files
+# Env files (MUHIM: maxfiy ma'lumotlar)
 .env
 .env.local
 .env*.local
 frontend/.env.local
+frontend/.env.production
 backend/.env
 
 # Logs
@@ -40,10 +41,48 @@ Thumbs.db
 # Archive
 _archive/
 
-# Large downloads
+# Large downloads & binaries
 frontend/public/downloads/*.exe
 frontend/public/downloads/*.dmg
+*.exe
+*.zip
+plink.exe
+pg_installer.exe
+postgres.zip
 
 # VPS only
 UBT POS/
 billing_service/
+
+# Deploy output (serverga yuklash uchun)
+deploy_output/
+posh-ssh-tmp/
+
+# Test files (local testing uchun)
+frontend/test_*.mjs
+frontend/test_*.js
+frontend/test_*.txt
+frontend/test_*.json
+frontend/get_users.sql
+frontend/check_superadmin.mjs
+frontend/reset_pass.mjs
+
+# Temp upload scripts
+temp_upload/
+
+# PostgreSQL local setup
+init_postgres.bat
+setup_postgres.bat
+init_err.txt
+init_out.txt
+
+# Temp test folder
+temp_test/
+test_race.js
+vercel.json
+
+# SSH keys and certs
+*.pem
+*.key
+*.crt
+

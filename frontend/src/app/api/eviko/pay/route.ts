@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
         const tenantId = await getAuthTenantId(request);
         if (!tenantId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-        const { tableId, items, paymentMethod, total, waiterName, tableLabel, serviceFee, customerId, extraFeeAmount } =
+        const { tableId, items, paymentMethod, total, waiterName, tableLabel, serviceFee, customerId, extraFeeAmount, payments } =
             await request.json();
 
         if (!items || items.length === 0) {
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
         const grandTotal = extraFeeAmount !== undefined && extraFeeAmount !== null
             ? Math.round((total || 0) + Number(extraFeeAmount))
             : Math.round((total || 0) * (1 + (serviceFee ?? 0)));
-        const methodName = METHOD_MAP[paymentMethod] || paymentMethod;
+        const methodName = payments && payments.length > 0 ? "Aralash" : (METHOD_MAP[paymentMethod] || paymentMethod);
 
         if (!customerId) {
             return NextResponse.json({ error: "To'lovni amalga oshirish uchun ro'yxatdan mijoz tanlashingiz shart!" }, { status: 400 });
@@ -122,18 +122,37 @@ export async function POST(request: NextRequest) {
         }
 
         // 1.b Create Moliya Income record automatically
-        await prisma.kassiHarakat.create({
-            data: {
-                tenantId,
-                type: "income",
-                category: "Sotuv tushumi",
-                amount: grandTotal,
-                description: `Sotuv ${tableLabel ? '(Stol: ' + tableLabel + ')' : '(POS Terminal)'}. Check: ${transaction.id.slice(-6)}`,
-                paymentMethod: methodName,
-                date: new Date(),
-                createdBy: waiterName || "System",
+        if (payments && payments.length > 0) {
+            for (const p of payments) {
+                if (p.amount > 0) {
+                    await prisma.kassiHarakat.create({
+                        data: {
+                            tenantId,
+                            type: "income",
+                            category: "Sotuv tushumi",
+                            amount: p.amount,
+                            description: `Sotuv ${tableLabel ? '(Stol: ' + tableLabel + ')' : '(POS Terminal)'}. Check: ${transaction.id.slice(-6)}`,
+                            paymentMethod: METHOD_MAP[p.method] || p.method,
+                            date: new Date(),
+                            createdBy: waiterName || "System",
+                        }
+                    });
+                }
             }
-        });
+        } else {
+            await prisma.kassiHarakat.create({
+                data: {
+                    tenantId,
+                    type: "income",
+                    category: "Sotuv tushumi",
+                    amount: grandTotal,
+                    description: `Sotuv ${tableLabel ? '(Stol: ' + tableLabel + ')' : '(POS Terminal)'}. Check: ${transaction.id.slice(-6)}`,
+                    paymentMethod: methodName,
+                    date: new Date(),
+                    createdBy: waiterName || "System",
+                }
+            });
+        }
 
         // 2. Create TransactionItems + 🔴 KALKULYATSIYA: Deduct ingredients from stock
         for (const item of items as CartItem[]) {

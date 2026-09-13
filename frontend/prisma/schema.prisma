@@ -66,6 +66,7 @@ model Tenant {
   writeoffs            InventoryWriteoff[]
   kdsOrders            KDSOrder[]
   kassiHarakatlar      KassiHarakat[]
+  cashShifts           CashShift[]
   pharmacyDrugs        PharmacyDrug[]
   products             Product[]
   smartRecommendations SmartRecommendation[]
@@ -637,4 +638,25 @@ model UbtSupplier {
   info      String?
   createdAt DateTime @default(now())
   currency  String?  @default("UZS")
+}
+
+model CashShift {
+  id            String    @id @default(cuid())
+  tenantId      String
+  staffId       String?
+  staffName     String?
+  status        String    @default("OPEN")
+  startTime     DateTime  @default(now())
+  endTime       DateTime?
+  initialCash   Float     @default(0)
+  expectedCash  Float     @default(0)
+  actualCash    Float     @default(0)
+  cardTotal     Float     @default(0)
+  mixedTotal    Float     @default(0)
+  salesTotal    Float     @default(0)
+  expensesTotal Float     @default(0)
+  difference    Float     @default(0)
+  tenant        Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
 }

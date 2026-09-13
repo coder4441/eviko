@@ -683,7 +683,7 @@ function LoginForm() {
                 if (role === "Ofitsiant") { router.replace("/mobile/waiter"); return; }
                 if (role === "Kuryer") { router.replace("/mobile/courier"); return; }
                 if (role === "Zavsklad" || role === "Omborchi") { router.replace("/mobile/inventory"); return; }
-                router.replace("/eviko");
+                router.replace("/eviko-pos");
                 return;
             }
         }
@@ -748,21 +748,20 @@ function LoginForm() {
                 const staffData = { ...data.session.user, token: data.session.token, shopCode: data.shopCode, shopType: data.shopType };
                 useStore.getState().setDeviceSession(staffData);
 
-                // Agar Manablog (Kassa apparati) kiritilgan bo'lsa, xodim tanlash pini so'raladi
                 if (staffData.role === "Manablog" || staffData.role === "Apparat" || staffData.name?.toLowerCase().includes("apparat")) {
-                    router.push("/kassa/login");
+                    window.location.href = "/kassa/login";
                 } else {
                     // Shaxsiy xodim login bo'lsa, to'g'ridan-to'g'ri o'z ish stoliga kiradi
                     useStore.getState().setKassirSession(staffData);
 
                     if (staffData.role === "Ofitsiant") {
-                        router.push("/mobile/waiter");
+                        window.location.href = "/mobile/waiter";
                     } else if (staffData.role === "Kuryer") {
-                        router.push("/mobile/courier");
+                        window.location.href = "/mobile/courier";
                     } else if (staffData.role === "Zavsklad" || staffData.role === "Omborchi") {
-                        router.push("/mobile/inventory");
+                        window.location.href = "/mobile/inventory";
                     } else {
-                        router.push("/eviko-pos"); // Default kassir
+                        window.location.href = "/eviko-pos"; // Default kassir
                     }
                 }
             } catch {
@@ -802,13 +801,13 @@ function LoginForm() {
             if (res.ok && data.success) {
                 if (data.isSuperAdmin) {
                     useSuperAdminStore.getState().login(data.user);
-                    router.push("/super-admin");
+                    window.location.href = "/super-admin";
                     return;
                 }
                 localStorage.setItem("smart-active-shop", data.tenant?.id || phoneVal);
                 useStore.getState().clearTenantData();
                 setUser({ id: data.tenant?.id || phoneVal, name: data.tenant?.shopName || phoneVal, role: "ADMIN", tenant: data.tenant, expiresAt: data.expiresAt });
-                router.push("/eviko");
+                window.location.href = "/eviko";
             } else {
                 setError(data.error || "Login yoki parol noto'g'ri");
             }

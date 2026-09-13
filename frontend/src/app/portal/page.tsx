@@ -37,7 +37,7 @@ export default function PortalPage() {
                         </p>
                         
                         <div className="mt-auto w-full">
-                            <Link href="/login" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3.5 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2">
+                            <Link href="/login?mode=admin" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3.5 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2">
                                 Tizimga kirish <ArrowRight size={16} />
                             </Link>
                         </div>

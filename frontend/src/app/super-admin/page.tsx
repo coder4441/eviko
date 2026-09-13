@@ -208,7 +208,15 @@ export default function SuperAdminPage() {
     const createMutation = useMutation({
         mutationFn: async (payload: any) => {
             const res = await fetch("/api/super-admin/tenants", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-            if (!res.ok) { const e = await res.json(); throw new Error(e.error || "Xatolik"); }
+            if (!res.ok) { 
+                const e = await res.json(); 
+                if (res.status === 401 || res.status === 403) {
+                    useSuperAdminStore.getState().logout();
+                    router.push("/super-admin/staff-login");
+                    throw new Error("Sessiya eskirgan. Iltimos qayta tizimga kiring.");
+                }
+                throw new Error(e.error || "Xatolik"); 
+            }
             return res.json();
         },
         onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["tenants"] }); setShowAddModal(false); },
