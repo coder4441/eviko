@@ -2,11 +2,17 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 from sqlalchemy.orm import declarative_base, declared_attr
 from src.core.config import settings
 
-# Async Engine Setup
+# Async Engine Setup — Ko'p foydalanuvchi uchun optimallashtirilgan
 engine = create_async_engine(
     settings.DATABASE_URL,
     echo=False,
-    future=True
+    future=True,
+    # === CONNECTION POOL SOZLAMALARI ===
+    pool_size=20,          # Doimiy ochiq ulanishlar soni (20 kassir = 20 ulanish)
+    max_overflow=30,       # Qo'shimcha ulanishlar (jami max: 50)
+    pool_timeout=30,       # Ulanish kutish vaqti (sekund)
+    pool_recycle=1800,     # 30 daqiqada ulanishni yangilash (stale connection oldini olish)
+    pool_pre_ping=True,    # Har so'rovdan avval ulanishni tekshirish
 )
 
 SessionFactory = async_sessionmaker(
